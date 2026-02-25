@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+set -eu -o pipefail
+
+# This file is `source`'d before calling `buildkite-agent pipeline upload`, and can be used
+# to set up some variables that will be interpolated in the `.yml` pipeline before uploading it.
+
+# https://github.com/Automattic/a8c-ci-toolkit-buildkite-plugin
+export CI_TOOLKIT_PLUGIN="automattic/a8c-ci-toolkit#3.1.0"
+
+# https://github.com/Automattic/nvm-buildkite-plugin
+export NVM_PLUGIN="automattic/nvm#0.6.0"
+
+# The ~> modifier is not currently used, but we check for it just in case
+xcode_version=$(sed 's/^~> //' apps/desktop/.xcode-version)
+export IMAGE_ID="xcode-$xcode_version"

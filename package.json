@@ -1,0 +1,38 @@
+{
+  "name": "cloudup-desktop",
+  "productName": "Cloudup",
+  "version": "1.0.0",
+  "description": "Cloudup desktop app - webview wrapper with native OS integration",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "dev": "CLOUDUP_ENV=development npm run build && CLOUDUP_ENV=development electron .",
+    "prod": "npm run build && electron .",
+    "stage": "CLOUDUP_ENV=staging npm run build && CLOUDUP_ENV=staging electron .",
+    "build": "tsc && node -e \"require('fs').writeFileSync('dist/shared/build-env.json', JSON.stringify({env: process.env.CLOUDUP_ENV || 'production'}))\"",
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:mac:stage": "CLOUDUP_ENV=staging npm run build && electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "clean": "rm -rf dist"
+  },
+  "author": "Automattic",
+  "license": "GPL-2.0-or-later",
+  "dependencies": {
+    "chokidar": "^4.0.0",
+    "electron-log": "^5.3.0",
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.7.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "electron": "35.0.0",
+    "electron-builder": "^26.4.0",
+    "typescript": "^5.7.0"
+  },
+  "overrides": {
+    "glob": "^11.0.0",
+    "rimraf": "^6.0.0"
+  }
+}

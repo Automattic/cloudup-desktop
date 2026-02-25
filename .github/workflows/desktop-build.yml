@@ -1,0 +1,56 @@
+name: Desktop App Build
+
+on:
+  push:
+    branches:
+      - feature/webview-desktop-app
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - production
+          - staging
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/desktop
+        run: npm ci
+
+      - name: Build and package
+        working-directory: apps/desktop
+        env:
+          CLOUDUP_ENV: ${{ github.event.inputs.environment || 'staging' }}
+        run: npm run build && npx electron-builder --mac --publish never
+
+      - name: List release artifacts
+        working-directory: apps/desktop
+        run: ls -la release/
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudup-desktop-mac-${{ github.event.inputs.environment || 'staging' }}
+          path: apps/desktop/release/*.dmg
+          retention-days: 30
+
+      - name: Upload ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudup-desktop-mac-zip-${{ github.event.inputs.environment || 'staging' }}
+          path: apps/desktop/release/*.zip
+          retention-days: 30

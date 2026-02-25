@@ -1,0 +1,12 @@
+# Icon assets
+#
+# Tray (macOS menu bar):
+# - trayIconTemplate.png, trayIconTemplate@2x.png (idle)
+# - trayIcon-uploadingTemplate.png, trayIcon-uploadingTemplate@2x.png
+# - trayIcon-errorTemplate.png, trayIcon-errorTemplate@2x.png
+# Template images should be grayscale/black; system adjusts for light/dark menu bar.
+#
+# App icon (packaged build):
+# - icon.png (512x512) — used for macOS DMG/app; generated from tray icon for alpha.
+#   Replace with a 1024x1024 PNG or icon.icns for production if desired.
+# - icon.ico (Windows) — add when building for Windows.

@@ -1,0 +1,74 @@
+# frozen_string_literal: true
+
+fastlane_version '2.0'
+
+default_platform :mac
+
+PROJECT_ROOT_FOLDER = File.dirname(File.expand_path(__dir__))
+
+AUTOMATTIC_TEAM_ID = 'PZYM8XX95Q'
+
+APP_BUNDLE_IDENTIFIER = 'com.automattic.cloudup'
+
+CODE_SIGNING_STORAGE_OPTIONS = {
+  storage_mode: 's3',
+  s3_bucket: 'a8c-fastlane-match',
+  s3_region: 'us-east-2'
+}.freeze
+
+CODE_SIGNING_ENV_VARS = %w[
+  MATCH_S3_ACCESS_KEY
+  MATCH_S3_SECRET_ACCESS_KEY
+  MATCH_PASSWORD
+].freeze
+
+ASC_API_KEY_ENV_VARS = %w[
+  APP_STORE_CONNECT_API_KEY_KEY_ID
+  APP_STORE_CONNECT_API_KEY_ISSUER_ID
+  APP_STORE_CONNECT_API_KEY_KEY
+].freeze
+
+def require_env_vars!(*keys)
+  keys.each do |key|
+    value = ENV.fetch(key, nil)
+    UI.user_error!("Environment variable '#{key}' is not set.") if value.nil?
+    UI.user_error!("Environment variable '#{key}' is set but empty.") if value.to_s.empty?
+  end
+end
+
+before_all do
+  setup_ci
+end
+
+platform :mac do
+  desc 'Download and configure code signing certificates for the Developer ID build.'
+  lane :configure_code_signing do |readonly: true|
+    require_env_vars!(*CODE_SIGNING_ENV_VARS) unless readonly
+
+    sync_code_signing(
+      type: 'developer_id',
+      team_id: AUTOMATTIC_TEAM_ID,
+      app_identifier: APP_BUNDLE_IDENTIFIER,
+      readonly: readonly,
+      api_key: (app_store_connect_api_key unless readonly),
+      **CODE_SIGNING_STORAGE_OPTIONS
+    )
+  end
+
+  desc 'Notarize the signed .app bundle.'
+  lane :notarize_binary do |architecture: 'arm64'|
+    require_env_vars!(*ASC_API_KEY_ENV_VARS)
+
+    dir_suffix = architecture == 'x64' ? '' : "-#{architecture}"
+    app_path = File.join(PROJECT_ROOT_FOLDER, 'release', "mac#{dir_suffix}", 'Cloudup.app')
+
+    UI.user_error!("App bundle not found at #{app_path}") unless File.exist?(app_path)
+    UI.message("Notarizing #{app_path}...")
+
+    notarize(
+      package: app_path,
+      api_key: app_store_connect_api_key,
+      print_log: true
+    )
+  end
+end
