@@ -60,3 +60,16 @@ function resolveEnv(): Environment {
 
 export const ENV: Environment = resolveEnv();
 export const CONFIG: EnvironmentConfig = ENVIRONMENTS[ENV];
+
+/**
+ * Returns true if hostname matches any entry in CONFIG.trustedDomains.
+ * Used for certificate verification and S3 requests in development.
+ */
+export function isTrustedDomain(hostname: string): boolean {
+  return CONFIG.trustedDomains.some((domain) => {
+    if (domain.startsWith('.')) {
+      return hostname.endsWith(domain) || hostname === domain.slice(1);
+    }
+    return hostname === domain || hostname.endsWith(`.${domain}`);
+  });
+}

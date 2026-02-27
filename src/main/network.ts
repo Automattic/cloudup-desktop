@@ -95,11 +95,6 @@ export class NetworkManager {
     this.onShowOfflinePage?.();
   }
 
-  /** Public so the uploader (or other code) can show the offline page when server is unreachable. */
-  showOfflinePage(): void {
-    this.loadOfflinePage();
-  }
-
   /**
    * Probe the web app URL; if reachable (2xx/3xx), reload the window with a sanity check.
    * Used when we're on the offline page (e.g. server was down, net.isOnline() stayed true).
@@ -155,10 +150,6 @@ export class NetworkManager {
     };
     this.win.webContents.once('did-finish-load', once);
     this.win.loadURL(CONFIG.webAppUrl);
-  }
-
-  getIsOffline(): boolean {
-    return this.isOffline;
   }
 
   stop(): void {

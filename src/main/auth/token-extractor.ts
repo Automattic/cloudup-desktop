@@ -151,18 +151,4 @@ export class TokenExtractor {
       }, 1000);
     });
   }
-
-  /**
-   * Check if user is logged in
-   */
-  async isAuthenticated(): Promise<boolean> {
-    return (await this.getToken()) !== null;
-  }
-
-  /**
-   * Clear cached token (call on logout)
-   */
-  clearCache(): void {
-    this.cachedToken = null;
-  }
 }

@@ -11,7 +11,7 @@ import { ScreenshotDetector } from './screenshot/detector';
 import { HotkeyManager } from './screenshot/hotkey';
 import { initAutoUpdater } from './updater';
 import { initPreferences, getAutoStreamScreenshots, setAutoStreamScreenshots } from './preferences';
-import { CONFIG, ENV } from '../shared/config';
+import { CONFIG, ENV, isTrustedDomain } from '../shared/config';
 
 // Configure logging
 log.transports.file.level = 'info';
@@ -39,12 +39,7 @@ if (CONFIG.allowInsecure && CONFIG.trustedDomains.length > 0) {
       callback(false);
       return;
     }
-    const isTrusted = CONFIG.trustedDomains.some((domain) => {
-      if (domain.startsWith('.')) {
-        return hostname.endsWith(domain) || hostname === domain.slice(1);
-      }
-      return hostname === domain || hostname.endsWith(`.${domain}`);
-    });
+    const isTrusted = isTrustedDomain(hostname);
     if (isTrusted) {
       event.preventDefault();
       callback(true);

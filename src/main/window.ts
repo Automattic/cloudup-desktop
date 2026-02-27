@@ -1,7 +1,7 @@
 import { BrowserWindow, session, Tray, shell } from 'electron';
 import * as path from 'path';
 import log from 'electron-log';
-import { CONFIG, ENV } from '../shared/config';
+import { CONFIG, ENV, isTrustedDomain } from '../shared/config';
 
 // Function to check if app is quitting (set from index.ts)
 let isQuittingFn: () => boolean = () => false;
@@ -19,12 +19,7 @@ export function createWindow(): BrowserWindow {
   if (CONFIG.allowInsecure && CONFIG.trustedDomains.length > 0) {
     ses.setCertificateVerifyProc((request, callback) => {
       const hostname = request.hostname;
-      const isTrusted = CONFIG.trustedDomains.some((domain) => {
-        if (domain.startsWith('.')) {
-          return hostname.endsWith(domain) || hostname === domain.slice(1);
-        }
-        return hostname === domain || hostname.endsWith(`.${domain}`);
-      });
+      const isTrusted = isTrustedDomain(hostname);
 
       if (isTrusted) {
         // Trust self-signed certificates for local development domains

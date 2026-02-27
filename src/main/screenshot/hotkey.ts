@@ -1,5 +1,6 @@
 import { globalShortcut, dialog } from 'electron';
 import log from 'electron-log';
+import { getOpenFileDialogOptions } from '../../shared/file-dialog';
 
 export class HotkeyManager {
   private shortcut: string;
@@ -26,14 +27,7 @@ export class HotkeyManager {
   }
 
   private async showFileDialog(): Promise<void> {
-    const result = await dialog.showOpenDialog({
-      properties: ['openFile', 'multiSelections'],
-      filters: [
-        { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] },
-        { name: 'Videos', extensions: ['mp4', 'mov', 'avi', 'mkv', 'webm'] },
-        { name: 'All Files', extensions: ['*'] },
-      ],
-    });
+    const result = await dialog.showOpenDialog(getOpenFileDialogOptions());
 
     if (!result.canceled && result.filePaths.length > 0) {
       this.callback?.(result.filePaths);

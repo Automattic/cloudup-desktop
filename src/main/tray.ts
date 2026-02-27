@@ -9,6 +9,7 @@ import {
   getAutoStreamScreenshots,
   setAutoStreamScreenshots,
 } from './preferences';
+import { getOpenFileDialogOptions } from '../shared/file-dialog';
 
 export type TrayState = 'idle' | 'uploading' | 'error';
 
@@ -64,14 +65,7 @@ export class TrayManager {
   }
 
   private async showFileDialog(): Promise<void> {
-    const result = await dialog.showOpenDialog({
-      properties: ['openFile', 'multiSelections'],
-      filters: [
-        { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] },
-        { name: 'Videos', extensions: ['mp4', 'mov', 'avi', 'mkv', 'webm'] },
-        { name: 'All Files', extensions: ['*'] },
-      ],
-    });
+    const result = await dialog.showOpenDialog(getOpenFileDialogOptions());
 
     if (!result.canceled && result.filePaths.length > 0 && this.fileDropCallback) {
       this.fileDropCallback(result.filePaths);

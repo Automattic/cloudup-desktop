@@ -7,7 +7,7 @@ import { URL } from 'url';
 import log from 'electron-log';
 import { TokenExtractor } from '../auth/token-extractor';
 import { TokenStore } from '../auth/token-store';
-import { CONFIG } from '../../shared/config';
+import { CONFIG, isTrustedDomain } from '../../shared/config';
 
 function isNetworkUnreachableError(err: Error): boolean {
   const msg = err.message?.toLowerCase() ?? '';
@@ -250,14 +250,7 @@ export class Uploader {
 
       // Check if hostname is in trusted domains for development
       const hostname = url.hostname;
-      const isTrustedDomain =
-        CONFIG.allowInsecure &&
-        CONFIG.trustedDomains.some((domain) => {
-          if (domain.startsWith('.')) {
-            return hostname.endsWith(domain) || hostname === domain.slice(1);
-          }
-          return hostname === domain || hostname.endsWith(`.${domain}`);
-        });
+      const acceptSelfSigned = CONFIG.allowInsecure && isTrustedDomain(hostname);
 
       const options: https.RequestOptions = {
         hostname: hostname,
@@ -269,10 +262,10 @@ export class Uploader {
         },
         // In development, accept self-signed certificates for trusted domains
         // This is safe because we only do this for explicitly trusted domains in development mode
-        rejectUnauthorized: !isTrustedDomain,
+        rejectUnauthorized: !acceptSelfSigned,
       };
 
-      if (isTrustedDomain) {
+      if (acceptSelfSigned) {
         log.debug('Accepting self-signed certificate for S3 upload', {
           hostname,
           s3Url: s3Url.substring(0, 100) + '...', // Log partial URL for debugging
@@ -344,7 +337,7 @@ export class Uploader {
             s3Url: s3Url.substring(0, 100) + '...',
             error: err.message,
             trustedDomains: CONFIG.trustedDomains,
-            isTrustedDomain,
+            acceptSelfSigned,
           });
         }
         reject(err);
