@@ -2,6 +2,7 @@ import { BrowserWindow, session, Tray, shell } from 'electron';
 import * as path from 'path';
 import log from 'electron-log';
 import { CONFIG, ENV, isTrustedDomain } from '../shared/config';
+import { isAppReadyForAuth, setShowingOfflinePage } from './offline-state';
 
 // Function to check if app is quitting (set from index.ts)
 let isQuittingFn: () => boolean = () => false;
@@ -146,6 +147,7 @@ export function setupInitialAuthCheck(win: BrowserWindow, tray: Tray): void {
 
   win.webContents.on('did-finish-load', async () => {
     if (hasCheckedAuth) return; // Only check once on initial load
+    if (!isAppReadyForAuth(win.webContents.getURL())) return;
     hasCheckedAuth = true;
 
     try {
@@ -163,6 +165,7 @@ export function setupInitialAuthCheck(win: BrowserWindow, tray: Tray): void {
 
       if (!token) {
         log.info('User not logged in, showing login page');
+        setShowingOfflinePage(false);
         win.loadURL(`${CONFIG.webAppUrl}/login`);
         // Show window so user can log in
         positionWindowBelowTray(win, tray);

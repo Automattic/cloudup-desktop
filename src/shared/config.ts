@@ -73,3 +73,21 @@ export function isTrustedDomain(hostname: string): boolean {
     return hostname === domain || hostname.endsWith(`.${domain}`);
   });
 }
+
+/**
+ * Returns true if the URL is the app origin (e.g. https://cloudup.test).
+ * For "should we run auth logic?" use isAppReadyForAuth from main/offline-state
+ * so the offline fallback page is excluded via explicit state.
+ */
+export function isAppUrl(url: string): boolean {
+  try {
+    const targetUrl = new URL(url);
+    if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') {
+      return false;
+    }
+    const appUrl = new URL(CONFIG.webAppUrl);
+    return targetUrl.origin === appUrl.origin;
+  } catch {
+    return false;
+  }
+}

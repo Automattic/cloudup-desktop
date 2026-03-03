@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron';
 import log from 'electron-log';
+import { isAppReadyForAuth } from '../offline-state';
 
 /** Seconds of clock skew to allow when checking JWT exp (e.g. 30s). */
 const JWT_EXP_CLOCK_SKEW_SEC = 30;
@@ -148,6 +149,7 @@ export class TokenExtractor {
   onAuthChange(callback: (token: string | null) => void): void {
     this.win.webContents.on('did-finish-load', async () => {
       if (this.win.isDestroyed()) return;
+      if (!isAppReadyForAuth(this.win.webContents.getURL())) return;
       // Small delay to let the app initialize
       setTimeout(async () => {
         if (this.win.isDestroyed()) return;

@@ -502,12 +502,20 @@ export class Uploader {
       if (result.error) {
         throw { message: result.error };
       }
+      if (!result.plan || !Array.isArray(result.plan.items)) {
+        throw {
+          message: 'Upload plan invalid. Please try again.',
+          code: 'SERVER_UNREACHABLE',
+        };
+      }
 
       plan = result.plan;
     } catch (err) {
       const error = err as Error;
       log.error('Failed to create upload plan', { error: error.message });
-      const code = isNetworkUnreachableError(error) ? 'SERVER_UNREACHABLE' : undefined;
+      const code =
+        (err as { code?: string }).code ??
+        (isNetworkUnreachableError(error) ? 'SERVER_UNREACHABLE' : undefined);
       throw { message: error.message, ...(code && { code }) };
     }
 

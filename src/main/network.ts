@@ -2,6 +2,7 @@ import { net, BrowserWindow } from 'electron';
 import * as path from 'path';
 import log from 'electron-log';
 import { CONFIG } from '../shared/config';
+import { isShowingOfflinePage, setShowingOfflinePage } from './offline-state';
 
 export class NetworkManager {
   private win: BrowserWindow;
@@ -16,6 +17,10 @@ export class NetworkManager {
     this.isOffline = !net.isOnline();
   }
 
+  private isWindowAlive(): boolean {
+    return !this.win.isDestroyed();
+  }
+
   start(callbacks?: { onReconnected?: () => void; onShowOfflinePage?: () => void }): void {
     this.onReconnected = callbacks?.onReconnected ?? null;
     this.onShowOfflinePage = callbacks?.onShowOfflinePage ?? null;
@@ -25,13 +30,13 @@ export class NetworkManager {
     // in newer Electron versions. Also retry when showing offline page (e.g. server
     // was down but machine stayed "online" - net.isOnline() never flips).
     this.checkInterval = setInterval(() => {
-      if (this.win.isDestroyed()) return;
+      if (!this.isWindowAlive()) return;
       const wasOffline = this.isOffline;
       this.isOffline = !net.isOnline();
 
       if (wasOffline && !this.isOffline) {
         log.info('Network came online');
-        if (this.win.webContents.getURL().includes('offline.html')) {
+        if (isShowingOfflinePage()) {
           log.info('Reloading web app after coming online');
           this.reloadWebAppWithSanityCheck();
         }
@@ -41,7 +46,7 @@ export class NetworkManager {
 
       // When showing offline page (after a load failure or server-unreachable from upload etc),
       // probe periodically until the server is back, then reload and stop probing
-      if (this.win.webContents.getURL().includes('offline.html') && !this.probeInProgress) {
+      if (isShowingOfflinePage() && !this.probeInProgress) {
         this.probeWebAppAndReloadIfReachable();
       }
     }, 3000);
@@ -81,7 +86,7 @@ export class NetworkManager {
         details.error ? details.error.includes(code) : false
       );
       if (!isConnectionError) return;
-      if (this.win.webContents.getURL().includes('offline.html')) return;
+      if (isShowingOfflinePage()) return;
       if (!this.win.webContents.getURL().startsWith(appOrigin)) return;
       log.warn('Request failed due to connection error, showing offline page', {
         error: details.error,
@@ -92,7 +97,8 @@ export class NetworkManager {
   }
 
   private loadOfflinePage(): void {
-    if (this.win.isDestroyed()) return;
+    if (!this.isWindowAlive()) return;
+    setShowingOfflinePage(true);
     const offlinePath = path.join(__dirname, '..', '..', 'assets', 'offline.html');
     this.win.loadFile(offlinePath);
     this.onShowOfflinePage?.();
@@ -110,7 +116,7 @@ export class NetworkManager {
     });
     request.on('response', (response) => {
       this.probeInProgress = false;
-      if (this.win.isDestroyed()) return;
+      if (!this.isWindowAlive()) return;
       if (response.statusCode >= 200 && response.statusCode < 400) {
         log.info('Web app reachable, reloading');
         this.reloadWebAppWithSanityCheck();
@@ -127,9 +133,10 @@ export class NetworkManager {
    * If the sanity check fails, show the offline page again so we keep retrying.
    */
   private reloadWebAppWithSanityCheck(): void {
-    if (this.win.isDestroyed()) return;
+    if (!this.isWindowAlive()) return;
+    setShowingOfflinePage(false);
     const once = () => {
-      if (this.win.isDestroyed()) return;
+      if (!this.isWindowAlive()) return;
       this.win.webContents.removeListener('did-finish-load', once);
       this.win.webContents
         .executeJavaScript(
@@ -142,7 +149,7 @@ export class NetworkManager {
           })()`
         )
         .then((ok: boolean) => {
-          if (this.win.isDestroyed()) return;
+          if (!this.isWindowAlive()) return;
           if (!ok) {
             log.warn('Reconnect sanity check failed: page is not the app, showing offline again');
             this.loadOfflinePage();
@@ -151,7 +158,7 @@ export class NetworkManager {
           }
         })
         .catch(() => {
-          if (this.win.isDestroyed()) return;
+          if (!this.isWindowAlive()) return;
           log.warn('Reconnect sanity check failed: check threw, showing offline again');
           this.loadOfflinePage();
         });
