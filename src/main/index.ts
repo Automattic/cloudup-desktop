@@ -162,7 +162,7 @@ if (!gotTheLock) {
     // Handle screenshot detection with permission prompt
     const handleScreenshot = async (filePath: string) => {
       const autoStream = getAutoStreamScreenshots();
-      
+
       if (autoStream === null) {
         // If dialog is already open, queue this screenshot
         if (permissionDialogOpen) {
@@ -180,12 +180,12 @@ if (!gotTheLock) {
             cancelId: 1,
             title: 'Auto-upload Screenshots?',
             message: 'Would you like to automatically upload screenshots to Cloudup?',
-            detail: `This screenshot will be uploaded: ${path.basename(filePath)}\n\nYou can change this setting anytime in the menu.`,
+            detail: `This screenshot will be uploaded: ${path.basename(filePath)}\n\nYou can change this setting anytime in the menu.\n\nIf you choose No, this screenshot won't be uploaded. You can manually upload it later.`,
           });
-          
+
           const enabled = result.response === 0;
           setAutoStreamScreenshots(enabled);
-          
+
           if (enabled) {
             // Batch all screenshots (current + queued) into a single upload
             const allPaths = [filePath, ...queuedScreenshots];
@@ -214,6 +214,7 @@ if (!gotTheLock) {
           cancelId: 0,
           title: 'Upload many files?',
           message: `Upload ${filePaths.length} files to Cloudup?`,
+          detail: "They'll be added to one stream.",
         });
         if (result.response !== 1) return;
       }

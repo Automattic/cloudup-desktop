@@ -80,7 +80,7 @@ export class NetworkManager {
       urls: [`${appOrigin}/*`, `${apiOrigin}/*`],
     };
     this.win.webContents.session.webRequest.onErrorOccurred(urlFilter, (details) => {
-      if (this.win.isDestroyed()) return;
+      if (!this.isWindowAlive()) return;
       log.debug('WebRequest error occurred', { error: details.error, url: details.url });
       const isConnectionError = connectionErrorCodes.some((code) =>
         details.error ? details.error.includes(code) : false

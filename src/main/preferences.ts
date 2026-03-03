@@ -61,8 +61,10 @@ export function getAutoStreamScreenshots(): boolean | null {
 export function initPreferences(): void {
   const openAtLogin = getOpenAtLogin();
   app.setLoginItemSettings({ openAtLogin });
+  const actualOpenAtLogin = app.getLoginItemSettings().openAtLogin;
+  preferences.set('openAtLogin', actualOpenAtLogin);
   log.info('Preferences initialized', {
-    openAtLogin,
+    openAtLogin: actualOpenAtLogin,
     autoStreamScreenshots: getAutoStreamScreenshots(),
   });
 }

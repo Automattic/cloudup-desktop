@@ -65,7 +65,9 @@ export class TrayManager {
   }
 
   private async showFileDialog(): Promise<void> {
-    const result = await dialog.showOpenDialog(getOpenFileDialogOptions());
+    const result = !this.win.isDestroyed()
+      ? await dialog.showOpenDialog(this.win, getOpenFileDialogOptions())
+      : await dialog.showOpenDialog(getOpenFileDialogOptions());
 
     if (!result.canceled && result.filePaths.length > 0 && this.fileDropCallback) {
       this.fileDropCallback(result.filePaths);

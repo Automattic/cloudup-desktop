@@ -8,6 +8,7 @@ import log from 'electron-log';
 import { TokenExtractor } from '../auth/token-extractor';
 import { TokenStore } from '../auth/token-store';
 import { CONFIG, isTrustedDomain } from '../../shared/config';
+import { setShowingOfflinePage } from '../offline-state';
 
 function isNetworkUnreachableError(err: Error): boolean {
   const msg = err.message?.toLowerCase() ?? '';
@@ -172,6 +173,15 @@ export class Uploader {
         log.warn('Upload failed: server unreachable', {
           error: error.message,
           code: error.code,
+          count: filePaths.length,
+        });
+        return;
+      }
+
+      if (error.code === 'UPLOAD_PLAN_INVALID') {
+        this.showUploadPlanInvalidNotification();
+        log.warn('Upload failed: invalid upload plan', {
+          error: error.message,
           count: filePaths.length,
         });
         return;
@@ -505,7 +515,7 @@ export class Uploader {
       if (!result.plan || !Array.isArray(result.plan.items)) {
         throw {
           message: 'Upload plan invalid. Please try again.',
-          code: 'SERVER_UNREACHABLE',
+          code: 'UPLOAD_PLAN_INVALID',
         };
       }
 
@@ -549,7 +559,7 @@ export class Uploader {
       });
       throw {
         message: 'Upload plan invalid. Please try again.',
-        code: 'SERVER_UNREACHABLE',
+        code: 'UPLOAD_PLAN_INVALID',
       };
     }
 
@@ -696,6 +706,10 @@ export class Uploader {
       body: 'Please log in to upload files',
     }).show();
     this.showWindow();
+    if (this.isWindowAlive()) {
+      setShowingOfflinePage(false);
+      this.win.loadURL(`${CONFIG.webAppUrl}/login`);
+    }
   }
 
   private showOfflineNotification(): void {
@@ -749,6 +763,13 @@ export class Uploader {
     new Notification({
       title: 'Server unreachable',
       body: 'Cannot reach Cloudup. Check your connection or VPN and try again.',
+    }).show();
+  }
+
+  private showUploadPlanInvalidNotification(): void {
+    new Notification({
+      title: 'Upload Failed',
+      body: 'Something went wrong preparing the upload. Please try again.',
     }).show();
   }
 }
