@@ -66,10 +66,8 @@ if (!gotTheLock) {
 
   // Handle second instance - show window
   app.on('second-instance', () => {
-    if (mainWindow) {
-      if (trayManager?.getTray()) {
-        toggleWindow(mainWindow, trayManager.getTray()!);
-      }
+    if (mainWindow && !mainWindow.isDestroyed() && trayManager?.getTray()) {
+      toggleWindow(mainWindow, trayManager.getTray()!);
     }
   });
 
@@ -141,7 +139,7 @@ if (!gotTheLock) {
       mainWindow,
       () => {
         // Show window (but don't toggle - we always want to show on upload)
-        if (mainWindow && trayManager?.getTray() && !mainWindow.isVisible()) {
+        if (mainWindow && !mainWindow.isDestroyed() && trayManager?.getTray() && !mainWindow.isVisible()) {
           toggleWindow(mainWindow, trayManager.getTray()!);
         }
       },
@@ -270,7 +268,7 @@ if (!gotTheLock) {
 
   app.on('activate', () => {
     // On macOS re-create window when dock icon is clicked
-    if (mainWindow && trayManager?.getTray()) {
+    if (mainWindow && !mainWindow.isDestroyed() && trayManager?.getTray()) {
       toggleWindow(mainWindow, trayManager.getTray()!);
     }
   });

@@ -54,6 +54,8 @@ export class TokenExtractor {
       return this.cachedToken;
     }
 
+    if (this.win.isDestroyed()) return null;
+
     // Try to extract from the web app's internal API object
     try {
       // The api object stores the token internally after initialization
@@ -114,6 +116,7 @@ export class TokenExtractor {
    * This endpoint uses session cookies to authenticate.
    */
   private async fetchTokenFromRefreshEndpoint(): Promise<string | null> {
+    if (this.win.isDestroyed()) return null;
     return new Promise((resolve) => {
       // Use executeJavaScript to make the request with cookies
       this.win.webContents
@@ -144,9 +147,12 @@ export class TokenExtractor {
    */
   onAuthChange(callback: (token: string | null) => void): void {
     this.win.webContents.on('did-finish-load', async () => {
+      if (this.win.isDestroyed()) return;
       // Small delay to let the app initialize
       setTimeout(async () => {
+        if (this.win.isDestroyed()) return;
         const token = await this.getToken();
+        if (this.win.isDestroyed()) return;
         callback(token);
       }, 1000);
     });

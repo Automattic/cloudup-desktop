@@ -51,6 +51,10 @@ export class Uploader {
     this.onUploadError = callbacks?.onUploadError;
   }
 
+  private isWindowAlive(): boolean {
+    return !this.win.isDestroyed();
+  }
+
   async upload(filePath: string): Promise<void> {
     return this.uploadMultiple([filePath]);
   }
@@ -121,6 +125,11 @@ export class Uploader {
       return;
     }
 
+    if (!this.isWindowAlive()) {
+      log.warn('Upload aborted: window closed');
+      return;
+    }
+
     this.batchRunning = true;
     try {
       this.onUploadStarted?.();
@@ -128,12 +137,13 @@ export class Uploader {
 
       await this.doUploadMultiple(validFiles);
 
+      if (!this.isWindowAlive()) return;
       // The web app shows upload progress and completion in the UI;
       // no separate success notification needed here.
       this.onUploadComplete?.();
       log.info('Upload queued', { count: filePaths.length });
     } catch (err) {
-      this.onUploadError?.();
+      if (this.isWindowAlive()) this.onUploadError?.();
       const error = err as { status?: number; message?: string; code?: string };
 
       if (error && error.status === 401) {
@@ -141,6 +151,10 @@ export class Uploader {
         TokenStore.clear();
         this.showLoginRequired();
         log.warn('Upload failed: unauthorized');
+        return;
+      }
+
+      if (error.code === 'WINDOW_CLOSED') {
         return;
       }
 
@@ -164,7 +178,9 @@ export class Uploader {
       }
 
       log.error('Upload failed', { error: error.message, code: error.code, count: filePaths.length });
-      this.showUploadErrorMultiple(filePaths, error.message || 'Unknown error');
+      if (this.isWindowAlive()) {
+        this.showUploadErrorMultiple(filePaths, error.message || 'Unknown error');
+      }
     } finally {
       this.batchRunning = false;
     }
@@ -396,6 +412,12 @@ export class Uploader {
   ): Promise<void> {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
+      if (!this.isWindowAlive()) {
+        throw {
+          message: 'Window was closed.',
+          code: 'WINDOW_CLOSED',
+        };
+      }
       try {
         const ready = await this.win.webContents.executeJavaScript(
           `!!window.__cloudup_uploader__`
@@ -438,8 +460,11 @@ export class Uploader {
       return;
     }
 
+    if (!this.isWindowAlive()) return;
+
     // Wait for the web app's uploader to be available (handles cold start race)
     await this.waitForWebviewUploader();
+    if (!this.isWindowAlive()) return;
 
     let plan: {
       streamId: string;
@@ -453,6 +478,8 @@ export class Uploader {
         error?: string;
       }>;
     };
+
+    if (!this.isWindowAlive()) return;
 
     try {
       const result = await this.win.webContents.executeJavaScript(`
@@ -565,6 +592,7 @@ export class Uploader {
           lastSentPercent = percent;
           lastSentTime = now;
 
+          if (!this.isWindowAlive()) return;
           const itemIdEscaped = JSON.stringify(item.id);
           this.win.webContents
             .executeJavaScript(`
@@ -579,6 +607,7 @@ export class Uploader {
         });
 
         // Step 3: Mark item as complete via frontend helper
+        if (!this.isWindowAlive()) return;
         const completeResult = await this.win.webContents.executeJavaScript(`
           (async function() {
             try {
