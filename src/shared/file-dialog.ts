@@ -1,7 +1,7 @@
 import type { OpenDialogOptions } from 'electron';
 
 /**
- * Shared options for "open file(s)" dialogs (tray upload, hotkey upload).
+ * Shared options for "open file(s)" dialogs (tray upload).
  * Returns a new object each call so Electron receives a mutable options object.
  */
 export function getOpenFileDialogOptions(): OpenDialogOptions {

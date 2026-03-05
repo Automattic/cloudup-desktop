@@ -5,7 +5,6 @@ A native macOS menu bar app that wraps the Cloudup web app with native OS integr
 ## Features
 
 - **Menu bar tray icon** with visual state indicators (idle / uploading / error)
-- **Global hotkey** (`Cmd+Shift+U`) to upload files from anywhere via a file picker (supports multi-select)
 - **Screenshot auto-detection** watches `~/Desktop` and `~/Pictures/Screenshots` for new screenshots; opt-in on first detection via a permission dialog
 - **Drag-and-drop** files onto the tray icon to upload (multiple files go to the same stream)
 - **Bulk upload confirmation** asks before uploading more than 5 files at once
@@ -125,8 +124,7 @@ apps/desktop/
 │   │   │   ├── token-extractor.ts  # JWT extraction from web session
 │   │   │   └── token-store.ts      # Encrypted token caching (safeStorage)
 │   │   ├── screenshot/
-│   │   │   ├── detector.ts       # File system watcher (chokidar)
-│   │   │   └── hotkey.ts         # Global Cmd+Shift+U handler
+│   │   │   └── detector.ts       # File system watcher (chokidar)
 │   │   └── upload/
 │   │       └── uploader.ts       # Upload orchestrator (web app → S3)
 │   ├── preload/
@@ -152,7 +150,7 @@ CI pipeline configuration lives at `.buildkite/desktop/` in the repository root.
 
 ## How It Works
 
-The app loads the Cloudup web app in an Electron BrowserWindow. When you upload a file (via hotkey, drag-drop, or screenshot detection), the native code:
+The app loads the Cloudup web app in an Electron BrowserWindow. When you upload a file (via drag-drop or screenshot detection), the native code:
 
 1. Extracts your auth token from the web app's session cookies (via `/refresh-token`, cached with `safeStorage`)
 2. Passes the files to the web app's uploader (`window.__cloudup_uploader__`) which creates a stream, items, and presigned S3 URLs

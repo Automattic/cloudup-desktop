@@ -1,4 +1,4 @@
-import { app, globalShortcut, BrowserWindow, dialog } from 'electron';
+import { app, BrowserWindow, dialog } from 'electron';
 import log from 'electron-log';
 import { createWindow, toggleWindow, setIsQuittingCheck, setupInitialAuthCheck } from './window';
 import * as path from 'path';
@@ -8,7 +8,6 @@ import { TokenExtractor } from './auth/token-extractor';
 import { TokenStore } from './auth/token-store';
 import { Uploader } from './upload/uploader';
 import { ScreenshotDetector } from './screenshot/detector';
-import { HotkeyManager } from './screenshot/hotkey';
 import { initAutoUpdater } from './updater';
 import { initPreferences, getAutoStreamScreenshots, setAutoStreamScreenshots } from './preferences';
 import { CONFIG, ENV, isTrustedDomain } from '../shared/config';
@@ -62,7 +61,6 @@ if (!gotTheLock) {
   let tokenExtractor: TokenExtractor | null = null;
   let uploader: Uploader | null = null;
   let screenshotDetector: ScreenshotDetector | null = null;
-  let hotkeyManager: HotkeyManager | null = null;
 
   // Handle second instance - show window
   app.on('second-instance', () => {
@@ -150,7 +148,7 @@ if (!gotTheLock) {
       }
     );
 
-    // Handle single file upload (for hotkey and screenshot detection)
+    // Handle single file upload (for screenshot detection)
     const handleUpload = (filePath: string) => {
       uploader?.upload(filePath);
     };
@@ -228,10 +226,6 @@ if (!gotTheLock) {
       log.error('Failed to start screenshot detector', { error: (err as Error).message });
     });
 
-    // Initialize global hotkey
-    hotkeyManager = new HotkeyManager();
-    hotkeyManager.register(handleUploadMultiple);
-
     // Set up tray file drop handler (batch upload)
     trayManager.onFileDrop(handleUploadMultiple);
 
@@ -261,10 +255,8 @@ if (!gotTheLock) {
 
     // Cleanup
     networkManager?.stop();
-    hotkeyManager?.unregister();
     screenshotDetector?.stop();
     trayManager?.destroy();
-    globalShortcut.unregisterAll();
   });
 
   app.on('activate', () => {

@@ -87,7 +87,6 @@ export class TrayManager {
       { type: 'separator' },
       {
         label: 'Upload File...',
-        accelerator: process.platform === 'darwin' ? 'Cmd+Shift+U' : 'Ctrl+Shift+U',
         click: () => {
           this.showFileDialog();
         },
