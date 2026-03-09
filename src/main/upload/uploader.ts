@@ -10,7 +10,7 @@ import { TokenStore } from '../auth/token-store';
 import { CONFIG, isTrustedDomain } from '../../shared/config';
 import { setShowingOfflinePage } from '../offline-state';
 
-function isNetworkUnreachableError(err: Error): boolean {
+export function isNetworkUnreachableError(err: Error): boolean {
   const msg = err.message?.toLowerCase() ?? '';
   const code = (err as NodeJS.ErrnoException).code?.toLowerCase() ?? '';
   return (
@@ -22,6 +22,47 @@ function isNetworkUnreachableError(err: Error): boolean {
     msg.includes('fetch failed') ||
     msg.includes('net::err_')
   );
+}
+
+export function getMimeType(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeTypes: Record<string, string> = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.mp4': 'video/mp4',
+    '.mov': 'video/quicktime',
+    '.avi': 'video/x-msvideo',
+    '.mkv': 'video/x-matroska',
+    '.webm': 'video/webm',
+    '.pdf': 'application/pdf',
+    '.zip': 'application/zip',
+  };
+  return mimeTypes[ext] || 'application/octet-stream';
+}
+
+/**
+ * Run a task for each item with at most `concurrency` tasks in flight.
+ * When one finishes, the next starts.
+ * If any task throws, the returned promise rejects and remaining tasks are not awaited.
+ */
+export async function runWithConcurrency<T>(
+  concurrency: number,
+  items: T[],
+  task: (item: T, index: number) => Promise<void>
+): Promise<void> {
+  const workerCount = Math.min(concurrency, items.length);
+  let nextIndex = 0;
+  async function worker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      await task(items[index], index);
+    }
+  }
+  const workers = Array.from({ length: workerCount }, () => worker());
+  await Promise.all(workers);
 }
 
 export class Uploader {
@@ -390,29 +431,6 @@ export class Uploader {
   }
 
   /**
-   * Run a task for each item with at most `concurrency` tasks in flight.
-   * When one finishes, the next starts.
-   * If any task throws, the returned promise rejects and remaining tasks are not awaited.
-   */
-  private async runWithConcurrency<T>(
-    concurrency: number,
-    items: T[],
-    task: (item: T, index: number) => Promise<void>
-  ): Promise<void> {
-    const workerCount = Math.min(concurrency, items.length);
-    let nextIndex = 0;
-    async function worker(): Promise<void> {
-      while (nextIndex < items.length) {
-        // Safe: only one worker runs at a time in the event loop, so nextIndex++ is not racy.
-        const index = nextIndex++;
-        await task(items[index], index);
-      }
-    }
-    const workers = Array.from({ length: workerCount }, () => worker());
-    await Promise.all(workers);
-  }
-
-  /**
    * Wait for the web app's uploader global to become available.
    * On cold start or reload, the dashboard JS may still be loading.
    */
@@ -456,7 +474,7 @@ export class Uploader {
         fileMetadata.push({
           name: path.basename(filePath),
           size: stats.size,
-          type: this.getMimeType(filePath),
+          type: getMimeType(filePath),
         });
       } catch (err) {
         log.warn('File inaccessible, skipping', {
@@ -590,7 +608,7 @@ export class Uploader {
     const PROGRESS_THROTTLE_MS = 500;
     const CONCURRENCY = 3;
 
-    await this.runWithConcurrency(CONCURRENCY, itemsToUpload, async (item) => {
+    await runWithConcurrency(CONCURRENCY, itemsToUpload, async (item) => {
       // item.index, item.s3_url, and item.id are guaranteed valid by the checks above
       const filePath = pathsToUpload[item.index];
       try {
@@ -679,25 +697,6 @@ export class Uploader {
         };
       }
     });
-  }
-
-  private getMimeType(filePath: string): string {
-    const ext = path.extname(filePath).toLowerCase();
-    const mimeTypes: Record<string, string> = {
-      '.png': 'image/png',
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.gif': 'image/gif',
-      '.webp': 'image/webp',
-      '.mp4': 'video/mp4',
-      '.mov': 'video/quicktime',
-      '.avi': 'video/x-msvideo',
-      '.mkv': 'video/x-matroska',
-      '.webm': 'video/webm',
-      '.pdf': 'application/pdf',
-      '.zip': 'application/zip',
-    };
-    return mimeTypes[ext] || 'application/octet-stream';
   }
 
   private showLoginRequired(): void {

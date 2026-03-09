@@ -7,11 +7,68 @@ import log from 'electron-log';
 
 const execAsync = promisify(exec);
 
-type ScreencapturePrefs = {
+export type ScreencapturePrefs = {
   location?: string;
   name?: string;
   type?: string;
 };
+
+/**
+ * Parse the output of `defaults read com.apple.screencapture`
+ * into structured preferences.
+ */
+export function parseScreencapturePrefs(stdout: string): ScreencapturePrefs {
+  const prefs: ScreencapturePrefs = {};
+
+  for (const rawLine of stdout.split('\n')) {
+    const line = rawLine.trim();
+    const match = line.match(/^"?(location|name|type)"?\s*=\s*(.+);$/);
+    if (!match) continue;
+
+    const key = match[1] as keyof ScreencapturePrefs;
+    let value = match[2].trim();
+
+    if (value.startsWith('"') && value.endsWith('"')) {
+      value = value.slice(1, -1);
+    }
+
+    prefs[key] = value;
+  }
+
+  return prefs;
+}
+
+export type IsScreenshotOpts = {
+  isDedicatedDir: boolean;
+  namePrefix: string | null;
+  extension: string;
+};
+
+/**
+ * Determine whether a file looks like a screenshot based on filename heuristics.
+ */
+export function isScreenshotFile(filePath: string, opts: IsScreenshotOpts): boolean {
+  const filename = path.basename(filePath);
+  const lower = filename.toLowerCase();
+
+  if (!lower.endsWith(opts.extension)) {
+    return false;
+  }
+
+  const baseName = filename.slice(0, filename.length - opts.extension.length);
+
+  if (opts.isDedicatedDir) {
+    return baseName.length >= 12;
+  }
+
+  const prefixes: string[] = [];
+  if (opts.namePrefix) {
+    prefixes.push(opts.namePrefix.toLowerCase());
+  }
+  prefixes.push('screen');
+
+  return prefixes.some((prefix) => lower.startsWith(prefix));
+}
 
 export class ScreenshotDetector {
   private watcher: FSWatcher | null = null;
@@ -30,25 +87,7 @@ export class ScreenshotDetector {
 
     try {
       const { stdout } = await execAsync('defaults read com.apple.screencapture');
-      const prefs: ScreencapturePrefs = {};
-
-      const lines = stdout.split('\n');
-      for (const rawLine of lines) {
-        const line = rawLine.trim();
-        // Match: key = value;
-        const match = line.match(/^"?(location|name|type)"?\s*=\s*(.+);$/);
-        if (!match) continue;
-
-        const key = match[1] as keyof ScreencapturePrefs;
-        let value = match[2].trim();
-
-        // Strip surrounding quotes if present
-        if (value.startsWith('"') && value.endsWith('"')) {
-          value = value.slice(1, -1);
-        }
-
-        prefs[key] = value;
-      }
+      const prefs = parseScreencapturePrefs(stdout);
 
       log.debug('Parsed com.apple.screencapture preferences', {
         hasLocation: !!prefs.location,
@@ -134,34 +173,11 @@ export class ScreenshotDetector {
   }
 
   private isScreenshot(filePath: string): boolean {
-    const filename = path.basename(filePath);
-    const lower = filename.toLowerCase();
-
-    // Only consider files with the configured screenshot extension
-    if (!lower.endsWith(this.screenshotFileExtension)) {
-      return false;
-    }
-
-    const baseName = filename.slice(0, filename.length - this.screenshotFileExtension.length);
-
-    // If we have a dedicated screenshot folder (non-Desktop), assume
-    // any reasonably long filename of the right type is a screenshot.
-    if (this.isDedicatedScreenshotDir) {
-      // "Screenshot 2024-01-15 at 10.30.00" is around 30+ chars; use a
-      // conservative threshold to avoid matching tiny names.
-      return baseName.length >= 12;
-    }
-
-    // On Desktop (or similar), be more conservative:
-    // - If user set a custom prefix, respect it
-    // - Otherwise, support the common English prefixes by looking for "screen"
-    const prefixes: string[] = [];
-    if (this.screenshotNamePrefix) {
-      prefixes.push(this.screenshotNamePrefix.toLowerCase());
-    }
-    prefixes.push('screen'); // covers "Screenshot" and "Screen Shot"
-
-    return prefixes.some((prefix) => lower.startsWith(prefix));
+    return isScreenshotFile(filePath, {
+      isDedicatedDir: this.isDedicatedScreenshotDir,
+      namePrefix: this.screenshotNamePrefix,
+      extension: this.screenshotFileExtension,
+    });
   }
 
   stop(): void {
