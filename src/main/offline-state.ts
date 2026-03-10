@@ -7,11 +7,11 @@ import { isAppUrl } from '../shared/config';
 let showingOfflinePage = false;
 
 export function setShowingOfflinePage(value: boolean): void {
-  showingOfflinePage = value;
+	showingOfflinePage = value;
 }
 
 export function isShowingOfflinePage(): boolean {
-  return showingOfflinePage;
+	return showingOfflinePage;
 }
 
 /**
@@ -19,5 +19,5 @@ export function isShowingOfflinePage(): boolean {
  * Use for auth checks and token extraction.
  */
 export function isAppReadyForAuth(url: string): boolean {
-  return isAppUrl(url) && !showingOfflinePage;
+	return isAppUrl(url) && !showingOfflinePage;
 }

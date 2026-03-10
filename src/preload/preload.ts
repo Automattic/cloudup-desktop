@@ -5,6 +5,6 @@ import { contextBridge } from 'electron';
  * Auth and uploads are handled by the webview (web app) itself.
  */
 contextBridge.exposeInMainWorld('cloudupDesktop', {
-  isDesktopApp: true,
-  platform: process.platform,
+	isDesktopApp: true,
+	platform: process.platform,
 });

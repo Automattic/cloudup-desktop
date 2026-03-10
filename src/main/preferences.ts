@@ -8,15 +8,15 @@ interface Preferences {
 }
 
 const defaults: Preferences = {
-  openAtLogin: false,
-  autoStreamScreenshots: null, // null = not set yet, will ask on first screenshot
+	openAtLogin: false,
+	autoStreamScreenshots: null, // null = not set yet, will ask on first screenshot
 };
 
 // electron-store extends Conf which has get/set methods
 // TypeScript may have trouble resolving the full type chain, so we use a type assertion
 const preferences = new Store<Preferences>({
-  name: 'cloudup-preferences',
-  defaults,
+	name: 'cloudup-preferences',
+	defaults,
 }) as Store<Preferences> & {
   get<K extends keyof Preferences>(key: K): Preferences[K];
   set<K extends keyof Preferences>(key: K, value: Preferences[K]): void;
@@ -26,24 +26,24 @@ const preferences = new Store<Preferences>({
  * Set whether the app should open at login
  */
 export function setOpenAtLogin(enabled: boolean): void {
-  app.setLoginItemSettings({ openAtLogin: enabled });
-  preferences.set('openAtLogin', enabled);
-  log.info('Open at login preference changed', { enabled });
+	app.setLoginItemSettings({ openAtLogin: enabled });
+	preferences.set('openAtLogin', enabled);
+	log.info('Open at login preference changed', { enabled });
 }
 
 /**
  * Get current open at login setting
  */
 export function getOpenAtLogin(): boolean {
-  return preferences.get('openAtLogin');
+	return preferences.get('openAtLogin');
 }
 
 /**
  * Set whether screenshots should be auto-streamed
  */
 export function setAutoStreamScreenshots(enabled: boolean): void {
-  preferences.set('autoStreamScreenshots', enabled);
-  log.info('Auto-stream screenshots preference changed', { enabled });
+	preferences.set('autoStreamScreenshots', enabled);
+	log.info('Auto-stream screenshots preference changed', { enabled });
 }
 
 /**
@@ -51,7 +51,7 @@ export function setAutoStreamScreenshots(enabled: boolean): void {
  * Returns null if not set yet (first time), true/false for user's choice
  */
 export function getAutoStreamScreenshots(): boolean | null {
-  return preferences.get('autoStreamScreenshots');
+	return preferences.get('autoStreamScreenshots');
 }
 
 /**
@@ -59,12 +59,12 @@ export function getAutoStreamScreenshots(): boolean | null {
  * Syncs the login item setting with the stored preference
  */
 export function initPreferences(): void {
-  const openAtLogin = getOpenAtLogin();
-  app.setLoginItemSettings({ openAtLogin });
-  const actualOpenAtLogin = app.getLoginItemSettings().openAtLogin;
-  preferences.set('openAtLogin', actualOpenAtLogin);
-  log.info('Preferences initialized', {
-    openAtLogin: actualOpenAtLogin,
-    autoStreamScreenshots: getAutoStreamScreenshots(),
-  });
+	const openAtLogin = getOpenAtLogin();
+	app.setLoginItemSettings({ openAtLogin });
+	const actualOpenAtLogin = app.getLoginItemSettings().openAtLogin;
+	preferences.set('openAtLogin', actualOpenAtLogin);
+	log.info('Preferences initialized', {
+		openAtLogin: actualOpenAtLogin,
+		autoStreamScreenshots: getAutoStreamScreenshots(),
+	});
 }
