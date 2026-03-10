@@ -31,3 +31,7 @@ vendor/
 # Fastlane
 fastlane/README.md
 fastlane/report.xml
+
+# Stryker mutation testing
+stryker-tmp/
+reports/
