@@ -79,6 +79,11 @@ describe('isNetworkUnreachableError', () => {
 		expect(isNetworkUnreachableError(makeError('Permission denied', 'EACCES'))).toBe(false);
 		expect(isNetworkUnreachableError(makeError('Upload failed: 413'))).toBe(false);
 	});
+
+	it('handles error with no message (optional message)', () => {
+		const err = Object.assign(new Error(), { message: undefined });
+		expect(isNetworkUnreachableError(err)).toBe(false);
+	});
 });
 
 describe('runWithConcurrency', () => {

@@ -105,3 +105,11 @@ You need a baseline first (one full run). Commit or keep the incremental report 
 ### Pre-push hook (incremental, planned)
 
 A pre-push hook can run `make desktop:mutation-incremental` when the push includes **desktop test changes** (e.g. files under `apps/desktop/` matching `**/*.test.ts`), since mutation is about validating tests. Add it only after cleaning up existing Survived mutants. Until then, run `make desktop:mutation-incremental` manually when you change tests.
+
+---
+
+## Equivalent / unkillable mutants
+
+Some Survived mutants are **equivalent mutants**: the mutated code has the same observable behavior as the original, so no test can kill them (e.g. fallback `''` replaced with `"Stryker was here!"` where that value never affects any branch). These are not a shortcoming of the code or tests.
+
+**Strategy:** Use Stryker pragma comments in source to ignore unkillable mutants at the line or block level (e.g. `// Stryker disable StringLiteral` ... `// Stryker restore`). If a pattern emerges (e.g. many equivalent survivors for one mutator type), consider a global exclusion for that mutator in `stryker.config.json` (`mutator.excludedMutations`).

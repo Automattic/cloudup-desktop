@@ -39,6 +39,10 @@ describe('isTrustedDomain', () => {
 	it('rejects empty string', () => {
 		expect(isTrustedDomain('')).toBe(false);
 	});
+
+	it('rejects domain with trailing dot (not in list)', () => {
+		expect(isTrustedDomain('cloudup.test.')).toBe(false);
+	});
 });
 
 describe('isAppUrl', () => {
@@ -61,6 +65,7 @@ describe('isAppUrl', () => {
 
 	it('rejects non-http protocols', () => {
 		expect(isAppUrl('file:///offline.html')).toBe(false);
+		expect(isAppUrl('ftp://cloudup.test')).toBe(false);
 	});
 
 	it('returns false for invalid URLs', () => {

@@ -11,8 +11,10 @@ import { CONFIG, isTrustedDomain } from '../../shared/config';
 import { setShowingOfflinePage } from '../offline-state';
 
 export function isNetworkUnreachableError(err: Error): boolean {
+	// Stryker disable StringLiteral (fallback '' is equivalent to mutant for all inputs)
 	const msg = err.message?.toLowerCase() ?? '';
 	const code = (err as NodeJS.ErrnoException).code?.toLowerCase() ?? '';
+	// Stryker restore
 	return (
 		code === 'econnrefused' ||
     code === 'etimedout' ||

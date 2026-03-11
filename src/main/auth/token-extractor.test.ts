@@ -1,4 +1,4 @@
-import { isTokenExpired } from './token-extractor';
+import { getJwtExpiration, isTokenExpired } from './token-extractor';
 
 function makeJwt(payload: Record<string, unknown>): string {
 	const header = Buffer.from(JSON.stringify({ alg: 'RS256' })).toString('base64url');
@@ -36,6 +36,11 @@ describe('isTokenExpired', () => {
 		expect(isTokenExpired('a.b')).toBe(false);
 	});
 
+	it('returns false for token with four segments (invalid JWT shape)', () => {
+		const payload = Buffer.from(JSON.stringify({ exp: 0 })).toString('base64url');
+		expect(isTokenExpired(`a.${payload}.sig.extra`)).toBe(false);
+	});
+
 	it('returns false for token with exp as non-number in payload', () => {
 		expect(isTokenExpired(makeJwt({ exp: '123' }))).toBe(false);
 	});
@@ -54,5 +59,12 @@ describe('isTokenExpired', () => {
 
 	it('returns false for malformed base64 payload', () => {
 		expect(isTokenExpired('header.!!!.signature')).toBe(false);
+	});
+});
+
+describe('getJwtExpiration', () => {
+	it('returns null for payload that is not valid JSON', () => {
+		const payload = Buffer.from('not valid json', 'utf8').toString('base64url');
+		expect(getJwtExpiration(`header.${payload}.sig`)).toBe(null);
 	});
 });

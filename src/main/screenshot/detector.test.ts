@@ -50,6 +50,30 @@ describe('parseScreencapturePrefs', () => {
 }`;
 		expect(parseScreencapturePrefs(stdout)).toEqual({ type: 'heic' });
 	});
+
+	it('strips quotes from value and uses capture group', () => {
+		const stdout = 'name = "My Screenshot";';
+		const got = parseScreencapturePrefs(stdout);
+		expect(got.name).toBe('My Screenshot');
+	});
+
+	it('matches line with multiple spaces around =', () => {
+		const stdout = '  location  =  "/x";  ';
+		const got = parseScreencapturePrefs(stdout);
+		expect(got.location).toBe('/x');
+	});
+
+	it('strips only when value has both leading and trailing quote', () => {
+		// Value is three quote chars: opening " + literal " + closing " → stripped to "
+		const stdout = 'name = """;';
+		const got = parseScreencapturePrefs(stdout);
+		expect(got.name).toBe('"');
+	});
+
+	it('does not match line with trailing content after semicolon', () => {
+		const stdout = 'location = "/a"; junk';
+		expect(parseScreencapturePrefs(stdout)).toEqual({});
+	});
 });
 
 describe('isScreenshotFile', () => {
@@ -88,6 +112,10 @@ describe('isScreenshotFile', () => {
 			expect(isScreenshotFile('my-image.png', defaultOpts)).toBe(false);
 		});
 
+		it('matches short basename when prefix matches (non-dedicated dir)', () => {
+			expect(isScreenshotFile('screen.png', defaultOpts)).toBe(true);
+		});
+
 		it('rejects wrong extension', () => {
 			expect(isScreenshotFile('Screenshot 2024-01-15.jpg', defaultOpts)).toBe(false);
 		});
@@ -115,6 +143,11 @@ describe('isScreenshotFile', () => {
 		it('rejects short filenames', () => {
 			expect(isScreenshotFile('a.png', dedicatedOpts)).toBe(false);
 			expect(isScreenshotFile('short-name.png', dedicatedOpts)).toBe(false);
+			expect(isScreenshotFile('12345678901.png', dedicatedOpts)).toBe(false);
+		});
+
+		it('accepts basename of length 12 in dedicated dir', () => {
+			expect(isScreenshotFile('123456789012.png', dedicatedOpts)).toBe(true);
 		});
 
 		it('rejects wrong extension', () => {

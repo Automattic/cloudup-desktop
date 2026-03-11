@@ -125,3 +125,34 @@ describe('TokenStore with encryption', () => {
 		expect(TokenStoreEnc.load()).toBe(null);
 	});
 });
+
+describe('TokenStore unpackaged with encryption available', () => {
+	let TokenStoreUnpacked: typeof TokenStore;
+
+	beforeAll(() => {
+		jest.resetModules();
+		const electronMock = jest.requireActual('../../../__mocks__/electron');
+		jest.doMock('electron', () => ({
+			...electronMock,
+			app: { ...electronMock.app, isPackaged: false },
+			safeStorage: {
+				...electronMock.safeStorage,
+				isEncryptionAvailable: () => true,
+			},
+		}));
+		const storeMod = require('./token-store');
+		TokenStoreUnpacked = storeMod.TokenStore;
+	});
+
+	beforeEach(() => {
+		delete store['encrypted_token'];
+		delete store['plaintext_token'];
+	});
+
+	it('uses plaintext storage when unpackaged even if encryption is available', () => {
+		TokenStoreUnpacked.save('my-token');
+		expect(store['plaintext_token']).toBe('my-token');
+		expect(store['encrypted_token']).toBeUndefined();
+		expect(TokenStoreUnpacked.load()).toBe('my-token');
+	});
+});

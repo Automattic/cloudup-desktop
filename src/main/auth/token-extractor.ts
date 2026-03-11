@@ -9,7 +9,8 @@ const JWT_EXP_CLOCK_SKEW_SEC = 30;
  * Decode JWT payload (no signature verification; we only need exp).
  * Returns null if token is invalid or missing exp.
  */
-function getJwtExpiration(token: string): number | null {
+// Exported for direct assertion in tests (catch-block returns null vs undefined).
+export function getJwtExpiration(token: string): number | null {
 	try {
 		const parts = token.split('.');
 		if (parts.length !== 3) return null;
