@@ -61,6 +61,7 @@ export function isScreenshotFile(filePath: string, opts: IsScreenshotOpts): bool
 		return baseName.length >= 12;
 	}
 
+	// Stryker disable next-line ArrayDeclaration: initial [] is equivalent; "Stryker was here" never matches any prefix
 	const prefixes: string[] = [];
 	if (opts.namePrefix) {
 		prefixes.push(opts.namePrefix.toLowerCase());

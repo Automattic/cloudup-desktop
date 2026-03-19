@@ -22,6 +22,9 @@ jest.mock('electron-store', () => ({
 }));
 
 import { TokenStore } from './token-store';
+import log from 'electron-log';
+
+const mockLog = log as unknown as { debug: jest.Mock; error: jest.Mock };
 
 function makeExpiredJwt(): string {
 	const header = Buffer.from(JSON.stringify({ alg: 'RS256' })).toString('base64url');
@@ -37,29 +40,38 @@ function getStoreInstance(): { get: jest.Mock; set: jest.Mock; delete: jest.Mock
 beforeEach(() => {
 	delete store['encrypted_token'];
 	delete store['plaintext_token'];
+	mockLog.debug.mockClear();
+	mockLog.error.mockClear();
 });
 
 describe('TokenStore', () => {
 	it('load returns null when nothing saved', () => {
 		expect(TokenStore.load()).toBe(null);
+		expect(mockLog.debug).not.toHaveBeenCalledWith('Token loaded from storage');
 	});
 
 	it('save then load returns the token', () => {
 		TokenStore.save('my-token');
+		expect(mockLog.debug).toHaveBeenCalledWith('Token saved to plaintext storage (unpackaged)');
+		mockLog.debug.mockClear();
 		expect(TokenStore.load()).toBe('my-token');
+		expect(mockLog.debug).toHaveBeenCalledWith('Token loaded from storage');
 	});
 
 	it('clear then load returns null', () => {
 		TokenStore.save('my-token');
+		mockLog.debug.mockClear();
 		TokenStore.clear();
+		expect(mockLog.debug).toHaveBeenCalledWith('Token cleared from storage');
 		expect(TokenStore.load()).toBe(null);
 	});
 
 	it('load returns null and clears when stored token is expired', () => {
 		const expired = makeExpiredJwt();
 		TokenStore.save(expired);
+		mockLog.debug.mockClear();
 		expect(TokenStore.load()).toBe(null);
-		expect(TokenStore.load()).toBe(null);
+		expect(mockLog.debug).toHaveBeenCalledWith('Stored token expired, clearing');
 	});
 
 	it('save does not throw when store.set throws', () => {
@@ -67,6 +79,7 @@ describe('TokenStore', () => {
 			throw new Error('storage full');
 		});
 		expect(() => TokenStore.save('my-token')).not.toThrow();
+		expect(mockLog.error).toHaveBeenCalledWith('Failed to save token', { error: 'storage full' });
 		expect(TokenStore.load()).toBe(null);
 	});
 
@@ -76,6 +89,7 @@ describe('TokenStore', () => {
 			throw new Error('read failed');
 		});
 		expect(TokenStore.load()).toBe(null);
+		expect(mockLog.error).toHaveBeenCalledWith('Failed to load token', { error: 'read failed' });
 	});
 
 	it('clear does not throw when store.delete throws', () => {
@@ -84,12 +98,14 @@ describe('TokenStore', () => {
 			throw new Error('delete failed');
 		});
 		expect(() => TokenStore.clear()).not.toThrow();
+		expect(mockLog.error).toHaveBeenCalledWith('Failed to clear token', { error: 'delete failed' });
 		expect(TokenStore.load()).toBe('my-token');
 	});
 });
 
 describe('TokenStore with encryption', () => {
 	let TokenStoreEnc: typeof TokenStore;
+	let encLog: { debug: jest.Mock; error: jest.Mock };
 
 	beforeAll(() => {
 		jest.resetModules();
@@ -105,6 +121,7 @@ describe('TokenStore with encryption', () => {
 		}));
 		const storeMod = require('./token-store');
 		TokenStoreEnc = storeMod.TokenStore;
+		encLog = require('electron-log').default;
 	});
 
 	beforeEach(() => {
@@ -116,7 +133,13 @@ describe('TokenStore with encryption', () => {
 		TokenStoreEnc.save('secret-token');
 		expect(store['plaintext_token']).toBeUndefined();
 		expect(store['encrypted_token']).toBeDefined();
+		expect(encLog.debug).toHaveBeenCalledWith('Token saved to secure storage');
 		expect(TokenStoreEnc.load()).toBe('secret-token');
+	});
+
+	it('load returns null when encrypted_token is empty', () => {
+		store['encrypted_token'] = '';
+		expect(TokenStoreEnc.load()).toBe(null);
 	});
 
 	it('clear removes encrypted token', () => {

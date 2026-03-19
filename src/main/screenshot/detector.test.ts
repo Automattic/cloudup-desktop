@@ -74,6 +74,34 @@ describe('parseScreencapturePrefs', () => {
 		const stdout = 'location = "/a"; junk';
 		expect(parseScreencapturePrefs(stdout)).toEqual({});
 	});
+
+	it('matches when no space after =', () => {
+		const stdout = 'type =png;';
+		expect(parseScreencapturePrefs(stdout)).toEqual({ type: 'png' });
+	});
+
+	it('trims whitespace from captured value', () => {
+		const stdout = 'name =  hello  ;';
+		const got = parseScreencapturePrefs(stdout);
+		expect(got.name).toBe('hello');
+	});
+
+	it('does not strip when value has only a leading quote', () => {
+		const stdout = 'name = "hello;';
+		const got = parseScreencapturePrefs(stdout);
+		expect(got.name).toBe('"hello');
+	});
+
+	it('does not strip when value has only a trailing quote', () => {
+		const stdout = 'name = hello";';
+		const got = parseScreencapturePrefs(stdout);
+		expect(got.name).toBe('hello"');
+	});
+
+	it('requires key at start of line (after trim)', () => {
+		const stdout = 'junk location = "/a";';
+		expect(parseScreencapturePrefs(stdout)).toEqual({});
+	});
 });
 
 describe('isScreenshotFile', () => {

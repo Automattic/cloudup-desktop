@@ -12,11 +12,8 @@ const ENVIRONMENTS: Record<string, EnvironmentConfig> = {
 		apiUrl: 'https://api.cloudup.test',
 		allowInsecure: true,
 		trustedDomains: [
-			'cloudup.test',
 			'.cloudup.test',
-			'cldup.test',
 			'.cldup.test',
-			'minio.test',
 			'.minio.test',
 		],
 		maxFileSize: 100 * 1024 * 1024, // 100MB
@@ -67,6 +64,7 @@ export const CONFIG: EnvironmentConfig = ENVIRONMENTS[ENV];
  */
 export function isTrustedDomain(hostname: string): boolean {
 	return CONFIG.trustedDomains.some((domain) => {
+		// Stryker disable next-line ConditionalExpression,StringLiteral: all current entries are dot-prefixed so condition is always true
 		if (domain.startsWith('.')) {
 			return hostname.endsWith(domain) || hostname === domain.slice(1);
 		}
@@ -82,7 +80,8 @@ export function isTrustedDomain(hostname: string): boolean {
 export function isAppUrl(url: string): boolean {
 	try {
 		const targetUrl = new URL(url);
-		if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') {
+		// Stryker disable next-line ConditionalExpression,BlockStatement: origin check already rejects non-https
+		if (targetUrl.protocol !== 'https:') {
 			return false;
 		}
 		const appUrl = new URL(CONFIG.webAppUrl);
