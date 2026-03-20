@@ -10,6 +10,10 @@ describe('ENV and CONFIG', () => {
 	it('has trusted domains in development', () => {
 		expect(CONFIG.trustedDomains.length).toBeGreaterThan(0);
 	});
+
+	it('has fallback upload limit', () => {
+		expect(CONFIG.fallbackUploadLimit).toBe(200_000_000);
+	});
 });
 
 describe('isTrustedDomain', () => {

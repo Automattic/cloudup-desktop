@@ -46,6 +46,20 @@ export function getMimeType(filePath: string): string {
 }
 
 /**
+ * Format a byte count for display (decimal MB/GB). Uses a 1000 MB → GB rollover so
+ * edge cases like 999_999_999 bytes show as "1.0 GB"; PHP's get_user_friendly_limit_for_user()
+ * would show "1000 MB" for that value — both match for our real limits (200M, 4.9G, 5G).
+ */
+export function formatFileSize(bytes: number): string {
+	const mb = Math.round(bytes / 1_000_000);
+	// Stryker disable next-line EqualityOperator,ConditionalExpression: bytes>=1e9 implies mb>=1000; both conditions agree for all inputs
+	if (bytes >= 1_000_000_000 || mb >= 1000) {
+		return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
+	}
+	return `${mb} MB`;
+}
+
+/**
  * Run a task for each item with at most `concurrency` tasks in flight.
  * When one finishes, the next starts.
  * If any task throws, the returned promise rejects and remaining tasks are not awaited.
@@ -66,6 +80,9 @@ export async function runWithConcurrency<T>(
 	const workers = Array.from({ length: workerCount }, () => worker());
 	await Promise.all(workers);
 }
+
+/** S3 single-part upload ceiling — no user can exceed this. */
+const S3_MAX_BYTES = 5 * 1000 * 1000 * 1000; // 5 GB
 
 export class Uploader {
 	private tokenExtractor: TokenExtractor;
@@ -132,12 +149,12 @@ export class Uploader {
 				});
 				continue;
 			}
-			if (stats.size > CONFIG.maxFileSize) {
+			if (stats.size > S3_MAX_BYTES) {
 				skippedFiles.push(filePath);
 				log.warn('File too large, skipping', {
 					path: filePath,
 					size: stats.size,
-					maxSize: CONFIG.maxFileSize,
+					maxSize: S3_MAX_BYTES,
 				});
 			} else {
 				validFiles.push(filePath);
@@ -145,7 +162,7 @@ export class Uploader {
 		}
 
 		if (skippedFiles.length > 0) {
-			this.showFileTooLargeNotification(skippedFiles);
+			this.showFileTooLargeNotification(skippedFiles, S3_MAX_BYTES);
 		}
 
 		if (validFiles.length === 0) {
@@ -433,9 +450,62 @@ export class Uploader {
 	}
 
 	/**
-   * Wait for the web app's uploader global to become available.
-   * On cold start or reload, the dashboard JS may still be loading.
-   */
+	 * Get the upload limit from the web app (user-specific). Falls back to
+	 * CONFIG.fallbackUploadLimit if unavailable. Always capped at S3_MAX_BYTES.
+	 */
+	private async getUploadLimit(): Promise<number> {
+		try {
+			const limit = await this.win.webContents.executeJavaScript(`
+				(function() {
+					if (window.__cloudup_uploader__?.getUploadLimit) {
+						return window.__cloudup_uploader__.getUploadLimit();
+					}
+					return null;
+				})()
+			`);
+			if (typeof limit === 'number' && limit > 0) {
+				return Math.min(limit, S3_MAX_BYTES);
+			}
+		} catch (err) {
+			log.warn('Failed to get upload limit from web app', {
+				error: (err as Error).message,
+			});
+		}
+		return Math.min(CONFIG.fallbackUploadLimit, S3_MAX_BYTES);
+	}
+
+	/**
+	 * Get item limit info from the web app. Returns null if bridge unavailable or user not loaded.
+	 */
+	private async getItemLimitInfo(): Promise<{ current: number; max: number } | null> {
+		try {
+			const info = await this.win.webContents.executeJavaScript(`
+				(function() {
+					if (window.__cloudup_uploader__?.getItemLimitInfo) {
+						return window.__cloudup_uploader__.getItemLimitInfo();
+					}
+					return null;
+				})()
+			`);
+			if (
+				info &&
+				typeof info.current === 'number' &&
+				typeof info.max === 'number'
+			) {
+				return info;
+			}
+		} catch (err) {
+			log.warn('Failed to get item limit info from web app', {
+				error: (err as Error).message,
+			});
+		}
+		return null;
+	}
+
+	/**
+	 * Wait for the web app's uploader global to become available.
+	 * On cold start or reload, the dashboard JS may still be loading.
+	 */
 	private async waitForWebviewUploader(
 		pollIntervalMs = 500,
 		timeoutMs = 10_000
@@ -494,6 +564,54 @@ export class Uploader {
 
 		// Wait for the web app's uploader to be available (handles cold start race)
 		await this.waitForWebviewUploader();
+		if (!this.isWindowAlive()) return;
+
+		// Pass 2: apply user-specific upload limit (free 200MB, staff 4.9GB)
+		const uploadLimit = await this.getUploadLimit();
+		const validPaths: string[] = [];
+		const validMetadata: Array<{ name: string; size: number; type: string }> = [];
+		const pass2Skipped: string[] = [];
+		for (let i = 0; i < pathsToUpload.length; i++) {
+			if (fileMetadata[i].size > uploadLimit) {
+				pass2Skipped.push(pathsToUpload[i]);
+			} else {
+				validPaths.push(pathsToUpload[i]);
+				validMetadata.push(fileMetadata[i]);
+			}
+		}
+		if (pass2Skipped.length > 0) {
+			this.showFileTooLargeNotification(pass2Skipped, uploadLimit);
+		}
+		if (validPaths.length === 0) {
+			log.warn('No files within user upload limit');
+			return;
+		}
+		pathsToUpload.length = 0;
+		pathsToUpload.push(...validPaths);
+		fileMetadata.length = 0;
+		fileMetadata.push(...validMetadata);
+
+		// Pre-upload item limit check (advisory; server still enforces)
+		const itemLimitInfo = await this.getItemLimitInfo();
+		if (itemLimitInfo && itemLimitInfo.max > 0) {
+			const { current, max } = itemLimitInfo;
+			const remaining = max - current;
+			if (remaining <= 0) {
+				this.showItemLimitReachedNotification(current, max);
+				return;
+			}
+			if (pathsToUpload.length > remaining) {
+				this.showItemLimitPartialNotification(
+					remaining,
+					pathsToUpload.length,
+					current,
+					max
+				);
+				pathsToUpload.splice(remaining);
+				fileMetadata.splice(remaining);
+			}
+		}
+
 		if (!this.isWindowAlive()) return;
 
 		let plan: {
@@ -699,6 +817,21 @@ export class Uploader {
 				};
 			}
 		});
+
+		// Refresh user data so item counts and ItemLimitBanner stay current
+		if (this.isWindowAlive()) {
+			this.win.webContents
+				.executeJavaScript(`
+					(async function() {
+						if (window.__cloudup_uploader__?.refreshUser) {
+							await window.__cloudup_uploader__.refreshUser();
+						}
+					})()
+				`)
+				.catch((err) => {
+					log.debug('Failed to refresh user data after upload', err);
+				});
+		}
 	}
 
 	private showLoginRequired(): void {
@@ -720,19 +853,38 @@ export class Uploader {
 		}).show();
 	}
 
-	private showFileTooLargeNotification(filePaths: string[]): void {
-		const maxSizeMB = Math.round(CONFIG.maxFileSize / (1024 * 1024));
+	private showItemLimitReachedNotification(current: number, max: number): void {
+		new Notification({
+			title: 'Item Limit Reached',
+			body: `You've reached your limit of ${max.toLocaleString()} items (${current.toLocaleString()} used). Open Cloudup to manage your items.`,
+		}).show();
+	}
+
+	private showItemLimitPartialNotification(
+		allowed: number,
+		total: number,
+		current: number,
+		max: number
+	): void {
+		new Notification({
+			title: 'Item Limit',
+			body: `Only ${allowed} of ${total} files can be uploaded — you're at ${current.toLocaleString()}/${max.toLocaleString()} items.`,
+		}).show();
+	}
+
+	private showFileTooLargeNotification(filePaths: string[], limit: number): void {
+		const maxSize = formatFileSize(limit);
 		const count = filePaths.length;
 		if (count === 1) {
 			const filename = path.basename(filePaths[0]);
 			new Notification({
 				title: 'File Too Large',
-				body: `${filename} is too large to upload (maximum ${maxSizeMB}MB)`,
+				body: `${filename} is too large to upload (maximum ${maxSize})`,
 			}).show();
 		} else {
 			new Notification({
 				title: 'Files Too Large',
-				body: `${count} files are too large to upload (maximum ${maxSizeMB}MB each)`,
+				body: `${count} files are too large to upload (maximum ${maxSize} each)`,
 			}).show();
 		}
 	}

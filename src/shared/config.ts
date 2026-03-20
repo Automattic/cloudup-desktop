@@ -3,7 +3,8 @@ export interface EnvironmentConfig {
   apiUrl: string;
   allowInsecure: boolean;
   trustedDomains: string[];
-  maxFileSize: number; // Maximum file size in bytes
+  /** Default upload limit in bytes when webview bridge is unavailable (matches backend free-user limit). */
+  fallbackUploadLimit: number;
 }
 
 const ENVIRONMENTS: Record<string, EnvironmentConfig> = {
@@ -16,21 +17,21 @@ const ENVIRONMENTS: Record<string, EnvironmentConfig> = {
 			'.cldup.test',
 			'.minio.test',
 		],
-		maxFileSize: 100 * 1024 * 1024, // 100MB
+		fallbackUploadLimit: 200 * 1000 * 1000, // 200MB (decimal, matches backend)
 	},
 	staging: {
 		webAppUrl: 'https://stage-cloudup.com',
 		apiUrl: 'https://api.stage-cloudup.com',
 		allowInsecure: false,
 		trustedDomains: [],
-		maxFileSize: 100 * 1024 * 1024, // 100MB
+		fallbackUploadLimit: 200 * 1000 * 1000, // 200MB
 	},
 	production: {
 		webAppUrl: 'https://cloudup.com',
 		apiUrl: 'https://api.cloudup.com',
 		allowInsecure: false,
 		trustedDomains: [],
-		maxFileSize: 100 * 1024 * 1024, // 100MB
+		fallbackUploadLimit: 200 * 1000 * 1000, // 200MB
 	},
 };
 

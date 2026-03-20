@@ -1,4 +1,9 @@
-import { getMimeType, isNetworkUnreachableError, runWithConcurrency } from './uploader';
+import {
+	getMimeType,
+	isNetworkUnreachableError,
+	runWithConcurrency,
+	formatFileSize,
+} from './uploader';
 
 describe('getMimeType', () => {
 	it('returns correct MIME for common image types', () => {
@@ -35,6 +40,32 @@ describe('getMimeType', () => {
 
 	it('falls back for files with no extension', () => {
 		expect(getMimeType('README')).toBe('application/octet-stream');
+	});
+});
+
+describe('formatFileSize', () => {
+	it('formats bytes as MB for values under 1GB', () => {
+		expect(formatFileSize(200_000_000)).toBe('200 MB');
+		expect(formatFileSize(100_000_000)).toBe('100 MB');
+	});
+
+	it('formats bytes as GB for values 1GB and above', () => {
+		expect(formatFileSize(4_900_000_000)).toBe('4.9 GB');
+		expect(formatFileSize(5_000_000_000)).toBe('5.0 GB');
+		expect(formatFileSize(1_000_000_000)).toBe('1.0 GB');
+	});
+
+	it('rolls over to GB when MB rounds to 1000', () => {
+		expect(formatFileSize(999_999_999)).toBe('1.0 GB');
+	});
+
+	it('uses >= 1e9 so exactly 1 billion bytes is GB not MB', () => {
+		expect(formatFileSize(1_000_000_000)).toBe('1.0 GB');
+		expect(formatFileSize(1_000_000_000)).not.toBe('1000 MB');
+	});
+
+	it('just under 1e9 with 999 MB stays in MB', () => {
+		expect(formatFileSize(999_000_000)).toBe('999 MB');
 	});
 });
 
