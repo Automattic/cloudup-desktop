@@ -12,9 +12,84 @@ import { initAutoUpdater } from './updater';
 import { initPreferences, getAutoStreamScreenshots, setAutoStreamScreenshots } from './preferences';
 import { CONFIG, ENV, isTrustedDomain } from '../shared/config';
 
+function isBrokenPipeWriteError(err: unknown): boolean {
+	const e = err as NodeJS.ErrnoException;
+	if (!e || typeof e !== 'object') return false;
+	if (e.code === 'EIO' || e.code === 'EPIPE') return true;
+	return typeof e.message === 'string' && /\bwrite E(IO|PIPE)\b/i.test(e.message);
+}
+
+/**
+ * When stdout/stderr are disconnected (closed terminal, some launchers), console writes throw.
+ * electron-log's default internal handler logs those failures via console again → uncaught loop +
+ * Electron error dialogs that also call console.error.
+ *
+ * Console transport `writeFn` and `processInternalErrorFn` are electron-log implementation details
+ * (see node/createDefaultLogger.js). Re-verify when upgrading electron-log.
+ */
+function hardenElectronLogConsole(): void {
+	const consoleTransport = log.transports.console;
+	if (typeof consoleTransport.writeFn === 'function') {
+		const originalWrite = consoleTransport.writeFn.bind(consoleTransport);
+		consoleTransport.writeFn = (opts: Parameters<typeof consoleTransport.writeFn>[0]) => {
+			try {
+				originalWrite(opts);
+			} catch (err) {
+				if (!isBrokenPipeWriteError(err)) {
+					try {
+						log.transports.file({
+							data: ['electron-log console transport failed', err],
+							level: 'error',
+							date: new Date(),
+						});
+					} catch {
+						// ignore
+					}
+				}
+			}
+		};
+	}
+
+	type LogWithInternal = typeof log & { processInternalErrorFn?: (e: unknown) => void };
+	const logWithInternal = log as LogWithInternal;
+	if (typeof logWithInternal.processInternalErrorFn === 'function') {
+		logWithInternal.processInternalErrorFn = (e: unknown) => {
+			try {
+				log.transports.file({
+					data: ['Unhandled electron-log error', e],
+					level: 'error',
+					date: new Date(),
+				});
+			} catch {
+				// ignore
+			}
+		};
+	}
+
+	const onStdStreamError = (streamLabel: 'stdout' | 'stderr', err: unknown) => {
+		if (isBrokenPipeWriteError(err)) return;
+		try {
+			log.transports.file({
+				data: [`${streamLabel} stream error`, err],
+				level: 'error',
+				date: new Date(),
+			});
+		} catch {
+			// ignore
+		}
+		if (ENV !== 'production') {
+			throw err instanceof Error ? err : new Error(String(err));
+		}
+	};
+
+	process.stdout.on('error', (err) => onStdStreamError('stdout', err));
+	process.stderr.on('error', (err) => onStdStreamError('stderr', err));
+}
+
 // Configure logging
 log.transports.file.level = 'info';
 log.transports.console.level = ENV === 'production' ? 'warn' : 'debug';
+hardenElectronLogConsole();
 
 // Track if app is quitting (for window close handling)
 let isQuitting = false;
