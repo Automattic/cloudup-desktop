@@ -158,7 +158,7 @@ The app loads the Cloudup web app in an Electron BrowserWindow. When you upload 
 4. Reports progress to the web app (`updateItemProgress`) so the stream view shows a progress bar
 5. Tells the web app when each upload is done (`markItemComplete`)
 
-Upload logic (stream creation, presigned URLs, progress UI) stays in the web app; the desktop app only handles streaming file data to S3. Files larger than 100 MB are rejected with a notification.
+Upload logic (stream creation, presigned URLs, progress UI) stays in the web app; the desktop app only handles streaming file data to S3. Files exceeding the user's upload limit are rejected with a notification; the limit is fetched dynamically from the web app (200 MB for free accounts, up to 4.9 GB for staff).
 
 ## Web App Dependency
 
@@ -195,7 +195,7 @@ The app automatically trusts self-signed certificates for trusted domains (`*.cl
 ### Upload fails silently
 Check the terminal output for error messages. Common issues:
 - Not logged in (open the app and log in first)
-- File exceeds 100 MB size limit
+- File exceeds upload limit (200 MB for free accounts; higher for staff)
 - Network offline
 - Web app not running (for local development)
 
