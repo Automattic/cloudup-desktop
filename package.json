@@ -38,7 +38,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@stryker-mutator/core": "^9.0.0",
-    "@stryker-mutator/jest-runner": "^9.0.0",
+    "@stryker-mutator/jest-runner": "^9.6.1",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.0.0",
     "electron": "35.0.0",
