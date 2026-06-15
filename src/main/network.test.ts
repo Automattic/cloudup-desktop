@@ -7,20 +7,20 @@ const mockNet = net as jest.Mocked<typeof net> & {
 };
 
 function createMockWin() {
-	const webContentsListeners: Record<string, Function[]> = {};
-	let webRequestHandler: Function | null = null;
+	const webContentsListeners: Record<string, ((...args: unknown[]) => void)[]> = {};
+	let webRequestHandler: ((...args: unknown[]) => void) | null = null;
 
 	const webContents = {
-		on: jest.fn((event: string, fn: Function) => {
+		on: jest.fn((event: string, fn: (...args: unknown[]) => void) => {
 			webContentsListeners[event] = [...(webContentsListeners[event] ?? []), fn];
 		}),
-		once: jest.fn((event: string, fn: Function) => {
+		once: jest.fn((event: string, fn: (...args: unknown[]) => void) => {
 			webContentsListeners[`once:${event}`] = [fn];
 		}),
 		removeListener: jest.fn(),
 		session: {
 			webRequest: {
-				onErrorOccurred: jest.fn((_filter: unknown, fn: Function) => {
+				onErrorOccurred: jest.fn((_filter: unknown, fn: (...args: unknown[]) => void) => {
 					webRequestHandler = fn;
 				}),
 			},

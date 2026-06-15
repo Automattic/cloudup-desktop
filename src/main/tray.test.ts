@@ -34,9 +34,9 @@ jest.mock('electron', () => {
 	return {
 		...actual,
 		Tray: jest.fn().mockImplementation(() => {
-			const listeners: Record<string, Function[]> = {};
+			const listeners: Record<string, ((...args: unknown[]) => void)[]> = {};
 			mockTrayInstance = {
-				on: jest.fn((event: string, fn: Function) => {
+				on: jest.fn((event: string, fn: (...args: unknown[]) => void) => {
 					listeners[event] = [...(listeners[event] ?? []), fn];
 				}),
 				_emit: (event: string, ...args: unknown[]) => {
