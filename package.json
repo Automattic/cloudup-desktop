@@ -47,7 +47,7 @@
     "jest": "^30.4.2",
     "ts-jest": "^29.4.6",
     "typescript": "^5.7.0",
-    "typescript-eslint": "^8.57.0"
+    "typescript-eslint": "^8.61.1"
   },
   "overrides": {
     "glob": "^11.0.0",
