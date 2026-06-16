@@ -42,7 +42,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^22.0.0",
     "electron": "35.7.5",
-    "electron-builder": "^26.4.0",
+    "electron-builder": "^26.15.3",
     "eslint": "^10.5.0",
     "jest": "^30.4.2",
     "ts-jest": "^29.4.6",
