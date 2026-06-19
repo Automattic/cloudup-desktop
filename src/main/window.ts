@@ -40,11 +40,13 @@ export function createWindow(): BrowserWindow {
 		height: 650,
 		show: false,
 		frame: false,
+		// Electron 36+ removed the implicit transparent background when vibrancy is set.
+		transparent: true,
 		skipTaskbar: true,
 		alwaysOnTop: true,
 		resizable: false,
 		vibrancy: process.platform === 'darwin' ? 'under-window' : undefined,
-		backgroundColor: '#00000000', // Transparent for vibrancy
+		backgroundColor: '#00000000',
 		webPreferences: {
 			preload: path.join(__dirname, '..', 'preload', 'preload.js'),
 			session: ses,
@@ -108,6 +110,26 @@ export function createWindow(): BrowserWindow {
 
 	log.info('Main window created', { env: ENV, url: CONFIG.webAppUrl });
 
+	if (ENV === 'development') {
+		win.webContents.on('did-navigate', (_event, url) => {
+			log.debug('Window navigated', { url });
+		});
+		win.webContents.on('did-navigate-in-page', (_event, url) => {
+			log.debug('Window in-page nav', { url });
+		});
+		win.webContents.on('did-finish-load', () => {
+			log.debug('Page loaded', { url: win.webContents.getURL() });
+		});
+		win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+			log.warn('Page load failed', { errorCode, errorDescription, url: validatedURL });
+		});
+		win.webContents.on('console-message', (event) => {
+			if (event.level === 'warning' || event.level === 'error') {
+				log.debug('Webview console', { level: event.level, message: event.message.substring(0, 300) });
+			}
+		});
+	}
+
 	return win;
 }
 
@@ -133,16 +155,35 @@ export function toggleWindow(win: BrowserWindow, tray: Tray): void {
 	if (win.isVisible()) {
 		win.hide();
 	} else {
+		// Stryker disable next-line StringLiteral,ObjectLiteral
+		log.debug('Showing window', { url: win.webContents.getURL() });
 		positionWindowBelowTray(win, tray);
 		win.show();
 		win.focus();
 	}
 }
 
+// Initial-auth-check polling: getToken() can transiently return null right after
+// did-finish-load while the web app JS initializes and session cookies propagate.
+// Poll a few times before concluding the user is logged out, so a slow startup
+// doesn't bounce a logged-in user to the login page. ~3s total, comfortably past
+// TokenExtractor's 1000ms cache warm-up, and returns as soon as a token appears.
+const AUTH_CHECK_ATTEMPTS = 6;
+const AUTH_CHECK_INTERVAL_MS = 500;
+
 /**
- * Check authentication on initial load and show login page if not logged in
+ * Check authentication on initial load and show the login page if not logged in.
+ *
+ * Rather than wait a single fixed delay (which races on slow startup and can bounce
+ * a logged-in user to /login in Electron 42+), poll {@link getToken} up to
+ * {@link AUTH_CHECK_ATTEMPTS} times at {@link AUTH_CHECK_INTERVAL_MS} intervals and
+ * only fall back to the login page once every attempt has returned null.
  */
-export function setupInitialAuthCheck(win: BrowserWindow, tray: Tray): void {
+export function setupInitialAuthCheck(
+	win: BrowserWindow,
+	tray: Tray,
+	getToken: () => Promise<string | null>
+): void {
 	let hasCheckedAuth = false;
 
 	win.webContents.on('did-finish-load', async () => {
@@ -150,30 +191,28 @@ export function setupInitialAuthCheck(win: BrowserWindow, tray: Tray): void {
 		if (!isAppReadyForAuth(win.webContents.getURL())) return;
 		hasCheckedAuth = true;
 
-		try {
-			// Check if user is authenticated by trying to get a token
-			const token = await win.webContents.executeJavaScript(`
-        fetch('/refresh-token', {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' },
-          credentials: 'same-origin'
-        })
-        .then(r => r.json())
-        .then(data => data.access_token || null)
-        .catch(() => null)
-      `);
+		for (let attempt = 0; attempt < AUTH_CHECK_ATTEMPTS; attempt++) {
+			await new Promise<void>((resolve) => setTimeout(resolve, AUTH_CHECK_INTERVAL_MS));
+			if (win.isDestroyed()) return;
 
-			if (!token) {
-				log.info('User not logged in, showing login page');
-				setShowingOfflinePage(false);
-				win.loadURL(`${CONFIG.webAppUrl}/login`);
-				// Show window so user can log in
-				positionWindowBelowTray(win, tray);
-				win.show();
-				win.focus();
+			try {
+				if (await getToken()) {
+					return; // Logged in; nothing to do.
+				}
+			} catch (err) {
+				// Stryker disable next-line StringLiteral,ObjectLiteral: log-only, no behavior to assert.
+				log.warn('Failed to check auth status on load', { error: (err as Error).message });
 			}
-		} catch (err) {
-			log.warn('Failed to check auth status on load', { error: (err as Error).message });
 		}
+
+		// Every attempt came back empty — treat the user as logged out.
+		// Stryker disable next-line StringLiteral: log-only, no behavior to assert.
+		log.info('User not logged in, showing login page');
+		setShowingOfflinePage(false);
+		win.loadURL(`${CONFIG.webAppUrl}/login`);
+		// Show window so user can log in
+		positionWindowBelowTray(win, tray);
+		win.show();
+		win.focus();
 	});
 }

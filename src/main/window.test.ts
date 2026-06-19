@@ -1,4 +1,11 @@
-import { positionWindowBelowTray, toggleWindow } from './window';
+import log from 'electron-log';
+import { positionWindowBelowTray, toggleWindow, setupInitialAuthCheck } from './window';
+import { isAppReadyForAuth, setShowingOfflinePage } from './offline-state';
+
+jest.mock('./offline-state', () => ({
+	isAppReadyForAuth: jest.fn(() => true),
+	setShowingOfflinePage: jest.fn(),
+}));
 
 function makeMockWin(visible = false) {
 	return {
@@ -8,6 +15,9 @@ function makeMockWin(visible = false) {
 		focus: jest.fn(),
 		getBounds: jest.fn(() => ({ x: 0, y: 0, width: 420, height: 650 })),
 		setPosition: jest.fn(),
+		webContents: {
+			getURL: jest.fn(() => 'https://local-cloudup.com/'),
+		},
 	};
 }
 
@@ -98,5 +108,155 @@ describe('toggleWindow', () => {
 		const setPositionOrder = (win.setPosition as jest.Mock).mock.invocationCallOrder[0];
 		const showOrder = (win.show as jest.Mock).mock.invocationCallOrder[0];
 		expect(setPositionOrder).toBeLessThan(showOrder);
+	});
+});
+
+function makeAuthMockWin() {
+	const handlers: Record<string, (...args: any[]) => any> = {};
+	return {
+		isDestroyed: jest.fn(() => false),
+		show: jest.fn(),
+		focus: jest.fn(),
+		getBounds: jest.fn(() => ({ x: 0, y: 0, width: 420, height: 650 })),
+		setPosition: jest.fn(),
+		loadURL: jest.fn(),
+		webContents: {
+			getURL: jest.fn(() => 'https://cloudup.test/'),
+			on: jest.fn((event: string, cb: (...args: any[]) => any) => {
+				handlers[event] = cb;
+			}),
+		},
+		// Invoke the captured did-finish-load handler and return its promise.
+		fireDidFinishLoad: () => handlers['did-finish-load']?.(),
+	};
+}
+
+describe('setupInitialAuthCheck', () => {
+	beforeEach(() => {
+		jest.mocked(isAppReadyForAuth).mockReturnValue(true);
+	});
+
+	afterEach(() => {
+		jest.useRealTimers();
+	});
+
+	it('does not show the login page when a token is found on the first poll', async () => {
+		jest.useFakeTimers();
+		const win = makeAuthMockWin();
+		const tray = makeMockTray();
+		const getToken = jest.fn().mockResolvedValue('token-123');
+
+		setupInitialAuthCheck(win as any, tray as any, getToken);
+		const done = win.fireDidFinishLoad();
+		await jest.advanceTimersByTimeAsync(500);
+		await done;
+
+		expect(getToken).toHaveBeenCalledTimes(1);
+		expect(win.loadURL).not.toHaveBeenCalled();
+		expect(win.show).not.toHaveBeenCalled();
+	});
+
+	it('keeps polling and succeeds when the token appears on a later attempt', async () => {
+		jest.useFakeTimers();
+		const win = makeAuthMockWin();
+		const tray = makeMockTray();
+		const getToken = jest
+			.fn()
+			.mockResolvedValueOnce(null)
+			.mockResolvedValueOnce(null)
+			.mockResolvedValue('token-123');
+
+		setupInitialAuthCheck(win as any, tray as any, getToken);
+		const done = win.fireDidFinishLoad();
+		await jest.advanceTimersByTimeAsync(1500); // three polls at 500ms
+		await done;
+
+		expect(getToken).toHaveBeenCalledTimes(3);
+		expect(win.loadURL).not.toHaveBeenCalled();
+	});
+
+	it('shows the login page only after every poll returns null', async () => {
+		jest.useFakeTimers();
+		const win = makeAuthMockWin();
+		const tray = makeMockTray();
+		const getToken = jest.fn().mockResolvedValue(null);
+
+		setupInitialAuthCheck(win as any, tray as any, getToken);
+		const done = win.fireDidFinishLoad();
+		await jest.advanceTimersByTimeAsync(3000); // six polls at 500ms
+		await done;
+
+		expect(getToken).toHaveBeenCalledTimes(6);
+		expect(setShowingOfflinePage).toHaveBeenCalledWith(false);
+		expect(win.loadURL).toHaveBeenCalledWith(expect.stringContaining('/login'));
+		expect(win.show).toHaveBeenCalled();
+		expect(win.focus).toHaveBeenCalled();
+	});
+
+	it('keeps polling through a transient getToken error before falling back to login', async () => {
+		jest.useFakeTimers();
+		const win = makeAuthMockWin();
+		const tray = makeMockTray();
+		const getToken = jest
+			.fn()
+			.mockRejectedValueOnce(new Error('network'))
+			.mockResolvedValue('token-123');
+
+		setupInitialAuthCheck(win as any, tray as any, getToken);
+		const done = win.fireDidFinishLoad();
+		await jest.advanceTimersByTimeAsync(1000); // error on first poll, token on second
+		await done;
+
+		expect(getToken).toHaveBeenCalledTimes(2);
+		expect(log.warn).toHaveBeenCalledTimes(1); // the transient error is logged, not swallowed silently
+		expect(win.loadURL).not.toHaveBeenCalled();
+	});
+
+	it('stops polling and does not show login when the window is destroyed mid-check', async () => {
+		jest.useFakeTimers();
+		const win = makeAuthMockWin();
+		win.isDestroyed = jest.fn(() => true);
+		const tray = makeMockTray();
+		const getToken = jest.fn().mockResolvedValue(null);
+
+		setupInitialAuthCheck(win as any, tray as any, getToken);
+		const done = win.fireDidFinishLoad();
+		await jest.advanceTimersByTimeAsync(3000);
+		await done;
+
+		expect(getToken).not.toHaveBeenCalled();
+		expect(win.loadURL).not.toHaveBeenCalled();
+	});
+
+	it('runs the auth check only once across multiple loads', async () => {
+		jest.useFakeTimers();
+		const win = makeAuthMockWin();
+		const tray = makeMockTray();
+		const getToken = jest.fn().mockResolvedValue('token-123');
+
+		setupInitialAuthCheck(win as any, tray as any, getToken);
+		const first = win.fireDidFinishLoad();
+		await jest.advanceTimersByTimeAsync(500);
+		await first;
+
+		await win.fireDidFinishLoad(); // hasCheckedAuth guard short-circuits
+
+		expect(getToken).toHaveBeenCalledTimes(1);
+	});
+
+	it('skips the auth check when the window is not on the app URL', async () => {
+		jest.useFakeTimers();
+		jest.mocked(isAppReadyForAuth).mockReturnValue(false);
+		const win = makeAuthMockWin();
+		const tray = makeMockTray();
+		const getToken = jest.fn().mockResolvedValue(null);
+
+		setupInitialAuthCheck(win as any, tray as any, getToken);
+		const done = win.fireDidFinishLoad();
+		await jest.advanceTimersByTimeAsync(3000);
+		await done;
+
+		expect(getToken).not.toHaveBeenCalled();
+		expect(win.loadURL).not.toHaveBeenCalled();
 	});
 });

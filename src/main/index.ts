@@ -180,11 +180,6 @@ if (!gotTheLock) {
 		});
 		trayManager.create();
 
-		// Check auth on initial load and show login if needed
-		if (trayManager.getTray()) {
-			setupInitialAuthCheck(mainWindow, trayManager.getTray()!);
-		}
-
 		// Initialize network monitoring
 		networkManager = new NetworkManager(mainWindow);
 		networkManager.start({
@@ -205,6 +200,12 @@ if (!gotTheLock) {
 				log.info('Token cleared (user logged out)');
 			}
 		});
+
+		// Check auth on initial load and show login if needed.
+		// Must be set up after tokenExtractor so the getToken callback is valid.
+		if (trayManager.getTray()) {
+			setupInitialAuthCheck(mainWindow, trayManager.getTray()!, () => tokenExtractor!.getToken());
+		}
 
 		// Initialize uploader with the window (for certificate handling via webview)
 		uploader = new Uploader(
