@@ -741,7 +741,6 @@ export class Uploader {
 					const percent = Math.floor((100 * loaded) / total);
 					const now = Date.now();
 					const shouldSend =
-            percent >= 100 ||
             percent - lastSentPercent >= PROGRESS_THROTTLE_PERCENT ||
             now - lastSentTime >= PROGRESS_THROTTLE_MS;
 					if (!shouldSend) return;
