@@ -134,9 +134,10 @@ export class Uploader {
 			return;
 		}
 
-		// Filter out files that are too large
+		// Filter out files that are too large or are directories (not supported)
 		const validFiles: string[] = [];
 		const skippedFiles: string[] = [];
+		const skippedFolders: string[] = [];
 
 		for (const filePath of filePaths) {
 			let stats: fs.Stats;
@@ -149,7 +150,13 @@ export class Uploader {
 				});
 				continue;
 			}
-			if (stats.size > S3_MAX_BYTES) {
+			if (stats.isDirectory()) {
+				// Reject here, before any server-side item is created — the web app has
+				// no way to know this "file" is a folder, and streaming it later fails
+				// with EISDIR, leaving a stuck item with no way to clean it up.
+				skippedFolders.push(filePath);
+				log.warn('Folder dropped, skipping (folders are not supported)', { path: filePath });
+			} else if (stats.size > S3_MAX_BYTES) {
 				skippedFiles.push(filePath);
 				log.warn('File too large, skipping', {
 					path: filePath,
@@ -159,6 +166,10 @@ export class Uploader {
 			} else {
 				validFiles.push(filePath);
 			}
+		}
+
+		if (skippedFolders.length > 0) {
+			this.showFolderNotSupportedNotification(skippedFolders);
 		}
 
 		if (skippedFiles.length > 0) {
@@ -196,13 +207,17 @@ export class Uploader {
 			this.onUploadStarted?.();
 			this.showWindow(); // Show webview so user can see upload progress
 
-			await this.doUploadMultiple(validFiles);
+			const result = await this.doUploadMultiple(validFiles);
 
 			if (!this.isWindowAlive()) return;
-			// The web app shows upload progress and completion in the UI;
-			// no separate success notification needed here.
 			this.onUploadComplete?.();
 			log.info('Upload queued', { count: filePaths.length });
+			// The popup window is often hidden or on an unrelated page when a drop-upload
+			// finishes, so the web app's own in-page progress UI isn't a reliable signal —
+			// surface completion (and where it landed) via a native notification too.
+			if (result) {
+				this.showUploadSuccessNotification(result.uploadedCount, result.streamId);
+			}
 		} catch (err) {
 			if (this.isWindowAlive()) this.onUploadError?.();
 			const error = err as { status?: number; message?: string; code?: string };
@@ -534,7 +549,9 @@ export class Uploader {
 		};
 	}
 
-	private async doUploadMultiple(filePaths: string[]): Promise<void> {
+	private async doUploadMultiple(
+		filePaths: string[]
+	): Promise<{ streamId: string; uploadedCount: number } | void> {
 		// Step 1: Get upload plan from frontend (metadata only, no file data).
 		// Skip files that are missing or inaccessible so we don't fail the whole batch.
 		const pathsToUpload: string[] = [];
@@ -831,6 +848,8 @@ export class Uploader {
 					log.debug('Failed to refresh user data after upload', err);
 				});
 		}
+
+		return { streamId: plan.streamId, uploadedCount: itemsToUpload.length };
 	}
 
 	private showLoginRequired(): void {
@@ -869,6 +888,37 @@ export class Uploader {
 			title: 'Item Limit',
 			body: `Only ${allowed} of ${total} files can be uploaded — you're at ${current.toLocaleString()}/${max.toLocaleString()} items.`,
 		}).show();
+	}
+
+	private showFolderNotSupportedNotification(filePaths: string[]): void {
+		const count = filePaths.length;
+		if (count === 1) {
+			const filename = path.basename(filePaths[0]);
+			new Notification({
+				title: 'Folders Not Supported',
+				body: `"${filename}" is a folder — please drop individual files instead.`,
+			}).show();
+		} else {
+			new Notification({
+				title: 'Folders Not Supported',
+				body: `${count} folders were skipped — please drop individual files instead.`,
+			}).show();
+		}
+	}
+
+	private showUploadSuccessNotification(count: number, streamId: string): void {
+		const body = count === 1 ? 'Your file was uploaded to Cloudup.' : `${count} files were uploaded to Cloudup.`;
+		const notification = new Notification({
+			title: 'Upload Complete',
+			body,
+		});
+		notification.on('click', () => {
+			this.showWindow();
+			if (this.isWindowAlive()) {
+				this.win.loadURL(`${CONFIG.webAppUrl}/s/${streamId}`);
+			}
+		});
+		notification.show();
 	}
 
 	private showFileTooLargeNotification(filePaths: string[], limit: number): void {
