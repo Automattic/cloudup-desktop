@@ -11,6 +11,15 @@ export function setIsQuittingCheck(fn: () => boolean): void {
 	isQuittingFn = fn;
 }
 
+/**
+ * Whether the window's close handler should veto the close and hide the
+ * window instead (menu-bar app behavior), rather than letting it proceed.
+ * Only a real app quit (isQuitting === true) should allow the close through.
+ */
+export function shouldHideInsteadOfClose(isQuitting: boolean): boolean {
+	return !isQuitting;
+}
+
 export function createWindow(): BrowserWindow {
 	// Get or create the session for this environment
 	const ses = session.fromPartition(`persist:cloudup-${ENV}`);
@@ -102,7 +111,7 @@ export function createWindow(): BrowserWindow {
 
 	// Prevent window from being destroyed, just hide it
 	win.on('close', (event) => {
-		if (!isQuittingFn()) {
+		if (shouldHideInsteadOfClose(isQuittingFn())) {
 			event.preventDefault();
 			win.hide();
 		}

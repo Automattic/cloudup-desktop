@@ -8,7 +8,7 @@ import { TokenExtractor } from './auth/token-extractor';
 import { TokenStore } from './auth/token-store';
 import { Uploader } from './upload/uploader';
 import { ScreenshotDetector } from './screenshot/detector';
-import { initAutoUpdater } from './updater';
+import { initAutoUpdater, stopAutoUpdater } from './updater';
 import { initPreferences, getAutoStreamScreenshots, setAutoStreamScreenshots } from './preferences';
 import { CONFIG, ENV, isTrustedDomain } from '../shared/config';
 
@@ -326,6 +326,14 @@ if (!gotTheLock) {
 		}
 	});
 
+	// Fires for every real quit path (OS shutdown/logout, Cmd+Q, app.quit()) before
+	// windows are asked to close. Without this, the window's `close` handler in
+	// window.ts sees isQuitting still false for OS-initiated quits and vetoes the
+	// close (hides instead), which blocks macOS shutdown/logout entirely (#1734).
+	app.on('before-quit', () => {
+		setIsQuitting(true);
+	});
+
 	app.on('will-quit', () => {
 		log.info('App quitting');
 
@@ -333,6 +341,7 @@ if (!gotTheLock) {
 		networkManager?.stop();
 		screenshotDetector?.stop();
 		trayManager?.destroy();
+		stopAutoUpdater();
 	});
 
 	app.on('activate', () => {

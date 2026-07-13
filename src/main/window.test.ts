@@ -1,5 +1,5 @@
 import log from 'electron-log';
-import { positionWindowBelowTray, toggleWindow, setupInitialAuthCheck } from './window';
+import { positionWindowBelowTray, toggleWindow, setupInitialAuthCheck, shouldHideInsteadOfClose } from './window';
 import { isAppReadyForAuth, setShowingOfflinePage } from './offline-state';
 
 jest.mock('./offline-state', () => ({
@@ -108,6 +108,20 @@ describe('toggleWindow', () => {
 		const setPositionOrder = (win.setPosition as jest.Mock).mock.invocationCallOrder[0];
 		const showOrder = (win.show as jest.Mock).mock.invocationCallOrder[0];
 		expect(setPositionOrder).toBeLessThan(showOrder);
+	});
+});
+
+describe('shouldHideInsteadOfClose', () => {
+	it('vetoes the close (hides) when the app is not quitting', () => {
+		// Ordinary window close (click outside, red button, etc.) — menu-bar
+		// app should hide, not quit.
+		expect(shouldHideInsteadOfClose(false)).toBe(true);
+	});
+
+	it('allows the close through when the app is quitting', () => {
+		// Real quit path (OS shutdown/logout, Cmd+Q, tray Quit) — must not be
+		// vetoed, or macOS reports the app "couldn't quit" (#1734).
+		expect(shouldHideInsteadOfClose(true)).toBe(false);
 	});
 });
 

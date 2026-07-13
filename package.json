@@ -1,7 +1,7 @@
 {
   "name": "cloudup-desktop",
   "productName": "Cloudup",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Cloudup desktop app - webview wrapper with native OS integration",
   "main": "dist/main/index.js",
   "scripts": {

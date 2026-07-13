@@ -3,6 +3,8 @@ import { Notification } from 'electron';
 import log from 'electron-log';
 import { ENV } from '../shared/config';
 
+let updateCheckInterval: ReturnType<typeof setInterval> | null = null;
+
 export function initAutoUpdater(): void {
 	// Only run auto-updater in production
 	if (ENV !== 'production') {
@@ -20,7 +22,7 @@ export function initAutoUpdater(): void {
 	});
 
 	// Check for updates every 4 hours
-	setInterval(() => {
+	updateCheckInterval = setInterval(() => {
 		autoUpdater.checkForUpdates().catch((err) => {
 			log.error('Failed to check for updates', { error: err.message });
 		});
@@ -54,4 +56,15 @@ export function initAutoUpdater(): void {
 	autoUpdater.on('error', (err) => {
 		log.error('Auto-updater error', { error: err.message });
 	});
+}
+
+/**
+ * Clear the periodic update-check interval started by {@link initAutoUpdater}.
+ * Safe to call even if the updater was never started (non-production env).
+ */
+export function stopAutoUpdater(): void {
+	if (updateCheckInterval) {
+		clearInterval(updateCheckInterval);
+		updateCheckInterval = null;
+	}
 }
