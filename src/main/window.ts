@@ -215,13 +215,33 @@ export function setupInitialAuthCheck(
 		}
 
 		// Every attempt came back empty — treat the user as logged out.
+		// If the user has already opened the window (tray click during the poll),
+		// they are looking at the logged-out landing page — don't yank it away
+		// mid-read; its own "Log in" button covers them. Only the hidden window
+		// gets navigated and shown. (#1737)
+		if (win.isVisible()) {
+			// Stryker disable next-line StringLiteral: log-only, no behavior to assert.
+			log.info('User not logged in; window already open, leaving landing page in place');
+			return;
+		}
+
 		// Stryker disable next-line StringLiteral: log-only, no behavior to assert.
 		log.info('User not logged in, showing login page');
 		setShowingOfflinePage(false);
+		// Show the window only once the login page has rendered. Showing
+		// immediately after loadURL starts would flash the previous page (the
+		// stale logged-out shell on the dark vibrancy backdrop) before the login
+		// page paints — the "two login screens" in #1737. If the load fails
+		// instead, still show: the offline handling owns the window content then.
+		const showForLogin = () => {
+			positionWindowBelowTray(win, tray);
+			win.show();
+			win.focus();
+			win.webContents.removeListener('did-finish-load', showForLogin);
+			win.webContents.removeListener('did-fail-load', showForLogin);
+		};
+		win.webContents.once('did-finish-load', showForLogin);
+		win.webContents.once('did-fail-load', showForLogin);
 		win.loadURL(`${CONFIG.webAppUrl}/login`);
-		// Show window so user can log in
-		positionWindowBelowTray(win, tray);
-		win.show();
-		win.focus();
 	});
 }

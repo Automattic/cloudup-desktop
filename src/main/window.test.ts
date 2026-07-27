@@ -126,9 +126,11 @@ describe('shouldHideInsteadOfClose', () => {
 });
 
 function makeAuthMockWin() {
-	const handlers: Record<string, (...args: any[]) => any> = {};
+	const handlers: Record<string, (...args: unknown[]) => unknown> = {};
+	const onceHandlers: Record<string, (...args: unknown[]) => unknown> = {};
 	return {
 		isDestroyed: jest.fn(() => false),
+		isVisible: jest.fn(() => false),
 		show: jest.fn(),
 		focus: jest.fn(),
 		getBounds: jest.fn(() => ({ x: 0, y: 0, width: 420, height: 650 })),
@@ -139,9 +141,17 @@ function makeAuthMockWin() {
 			on: jest.fn((event: string, cb: (...args: any[]) => any) => {
 				handlers[event] = cb;
 			}),
+			once: jest.fn((event: string, cb: (...args: any[]) => any) => {
+				onceHandlers[event] = cb;
+			}),
+			removeListener: jest.fn((event: string) => {
+				delete onceHandlers[event];
+			}),
 		},
 		// Invoke the captured did-finish-load handler and return its promise.
 		fireDidFinishLoad: () => handlers['did-finish-load']?.(),
+		// Invoke a handler registered with once() (the login-page show hook).
+		fireOnce: (event: string) => onceHandlers[event]?.(),
 	};
 }
 
@@ -203,8 +213,60 @@ describe('setupInitialAuthCheck', () => {
 		expect(getToken).toHaveBeenCalledTimes(6);
 		expect(setShowingOfflinePage).toHaveBeenCalledWith(false);
 		expect(win.loadURL).toHaveBeenCalledWith(expect.stringContaining('/login'));
+
+		// The window must not show while the login page is still loading —
+		// that would flash the previous page before login paints (#1737).
+		expect(win.show).not.toHaveBeenCalled();
+
+		win.fireOnce('did-finish-load');
 		expect(win.show).toHaveBeenCalled();
 		expect(win.focus).toHaveBeenCalled();
+
+		// The fail-load hook must be detached once shown — a later load failure
+		// (e.g. a background navigation error) must not re-show the window.
+		win.fireOnce('did-fail-load');
+		expect(win.show).toHaveBeenCalledTimes(1);
+	});
+
+	it('leaves the landing page in place when the user already opened the window', async () => {
+		jest.useFakeTimers();
+		const win = makeAuthMockWin();
+		win.isVisible = jest.fn(() => true); // user tray-clicked during the poll
+		const tray = makeMockTray();
+		const getToken = jest.fn().mockResolvedValue(null);
+
+		setupInitialAuthCheck(win as any, tray as any, getToken);
+		const done = win.fireDidFinishLoad();
+		await jest.advanceTimersByTimeAsync(3000);
+		await done;
+
+		// The visible window must not be yanked to /login mid-read — the landing
+		// page's own Log in button covers the logged-out user (#1737).
+		expect(win.loadURL).not.toHaveBeenCalled();
+		expect(win.show).not.toHaveBeenCalled();
+	});
+
+	it('still shows the window when the login page fails to load', async () => {
+		jest.useFakeTimers();
+		const win = makeAuthMockWin();
+		const tray = makeMockTray();
+		const getToken = jest.fn().mockResolvedValue(null);
+
+		setupInitialAuthCheck(win as any, tray as any, getToken);
+		const done = win.fireDidFinishLoad();
+		await jest.advanceTimersByTimeAsync(3000);
+		await done;
+
+		expect(win.show).not.toHaveBeenCalled();
+
+		// Offline handling owns the window content on failure; the window must
+		// still become visible rather than staying hidden forever.
+		win.fireOnce('did-fail-load');
+		expect(win.show).toHaveBeenCalledTimes(1);
+
+		// The show hook must not double-fire if the other event arrives later.
+		win.fireOnce('did-finish-load');
+		expect(win.show).toHaveBeenCalledTimes(1);
 	});
 
 	it('keeps polling through a transient getToken error before falling back to login', async () => {
