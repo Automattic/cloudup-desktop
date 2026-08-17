@@ -2,7 +2,7 @@
 
 source 'https://rubygems.org'
 
-gem 'fastlane', '~> 2.237'
+gem 'fastlane', '~> 2.238'
 gem 'fastlane-plugin-wpmreleasetoolkit', '~> 11.0'
 # Installed to work around Ruby SSL errors. See AINFRA-1527.
 #
