@@ -944,7 +944,7 @@ export class Uploader {
 		notification.on('click', () => {
 			this.showWindow();
 			if (this.isWindowAlive()) {
-				this.win.loadURL(`${CONFIG.webAppUrl}/s/${streamId}`);
+				this.win.loadURL(`${CONFIG.webAppUrl}/${streamId}`);
 			}
 		});
 		notification.show();
