@@ -1,9 +1,32 @@
 import {
+	buildUploadMetadata,
 	getMimeType,
 	isNetworkUnreachableError,
 	runWithConcurrency,
 	formatFileSize,
 } from './uploader';
+
+describe('buildUploadMetadata', () => {
+	it('marks the file as a screenshot when the detector flagged it', () => {
+		// This flag is the entire trigger for private storage server-side; if it
+		// stops being sent, screenshots silently go back to being public.
+		expect(buildUploadMetadata('/tmp/Screen Shot.png', 1024, true)).toEqual({
+			name: 'Screen Shot.png',
+			size: 1024,
+			type: 'image/png',
+			screenshot: true,
+		});
+	});
+
+	it('defaults to not-a-screenshot for ordinary uploads', () => {
+		expect(buildUploadMetadata('/tmp/holiday.png', 2048)).toEqual({
+			name: 'holiday.png',
+			size: 2048,
+			type: 'image/png',
+			screenshot: false,
+		});
+	});
+});
 
 describe('getMimeType', () => {
 	it('returns correct MIME for common image types', () => {

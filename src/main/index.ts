@@ -224,9 +224,12 @@ if (!gotTheLock) {
 			}
 		);
 
-		// Handle single file upload (for screenshot detection)
+		// Handle single file upload (for screenshot detection). Everything reaching
+		// this callback came from the ScreenshotDetector, so it is marked as a
+		// screenshot — that flag is what lets the server store it privately when
+		// private_screenshots_enabled is on.
 		const handleUpload = (filePath: string) => {
-			uploader?.upload(filePath);
+			uploader?.upload(filePath, true);
 		};
 
 		// Track if permission dialog is currently showing to avoid race conditions
@@ -261,9 +264,11 @@ if (!gotTheLock) {
 					setAutoStreamScreenshots(enabled);
 
 					if (enabled) {
-						// Batch all screenshots (current + queued) into a single upload
+						// Batch all screenshots (current + queued) into a single upload.
+						// Every path here came from the detector, so the whole batch is
+						// marked as screenshots — same reasoning as handleUpload above.
 						const allPaths = [filePath, ...queuedScreenshots];
-						uploader?.uploadMultiple(allPaths);
+						uploader?.uploadMultiple(allPaths, true);
 					}
 					// Clear queue regardless of user's choice
 					queuedScreenshots.length = 0;

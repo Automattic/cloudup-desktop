@@ -84,6 +84,33 @@ export async function runWithConcurrency<T>(
 /** S3 single-part upload ceiling — no user can exceed this. */
 const S3_MAX_BYTES = 5 * 1000 * 1000 * 1000; // 5 GB
 
+export type FileUploadMetadata = {
+  name: string;
+  size: number;
+  type: string;
+  screenshot: boolean;
+};
+
+/**
+ * Build the per-file metadata entry sent to the web app's createUploadPlan.
+ *
+ * `screenshot` is what the detector already knows at capture time; it rides
+ * through to POST /items unchanged. The server alone decides what it means —
+ * the client never sets visibility.
+ */
+export function buildUploadMetadata(
+	filePath: string,
+	size: number,
+	isScreenshot = false
+): FileUploadMetadata {
+	return {
+		name: path.basename(filePath),
+		size,
+		type: getMimeType(filePath),
+		screenshot: isScreenshot,
+	};
+}
+
 export class Uploader {
 	private tokenExtractor: TokenExtractor;
 	private win: BrowserWindow;
@@ -116,15 +143,20 @@ export class Uploader {
 		return !this.win.isDestroyed();
 	}
 
-	async upload(filePath: string): Promise<void> {
-		return this.uploadMultiple([filePath]);
+	async upload(filePath: string, isScreenshot = false): Promise<void> {
+		return this.uploadMultiple([filePath], isScreenshot);
 	}
 
 	/**
    * Desktop upload path: only runs when user drops files on the tray icon or uses
    * "Upload File..." from the tray menu. Drops inside the webview use the web app's uploader.
+   *
+   * `isScreenshot` marks the batch as screenshots. The detector already knows
+   * this at capture time; the flag rides through to POST /items, where the
+   * server decides what it means (today: private storage while
+   * private_screenshots_enabled is on). The client never decides visibility.
    */
-	async uploadMultiple(filePaths: string[]): Promise<void> {
+	async uploadMultiple(filePaths: string[], isScreenshot = false): Promise<void> {
 		log.info('Upload requested', { paths: filePaths, count: filePaths.length });
 
 		// Check network connectivity
@@ -207,7 +239,7 @@ export class Uploader {
 			this.onUploadStarted?.();
 			this.showWindow(); // Show webview so user can see upload progress
 
-			const result = await this.doUploadMultiple(validFiles);
+			const result = await this.doUploadMultiple(validFiles, isScreenshot);
 
 			if (!this.isWindowAlive()) return;
 			this.onUploadComplete?.();
@@ -550,21 +582,18 @@ export class Uploader {
 	}
 
 	private async doUploadMultiple(
-		filePaths: string[]
+		filePaths: string[],
+		isScreenshot = false
 	): Promise<{ streamId: string; uploadedCount: number } | void> {
 		// Step 1: Get upload plan from frontend (metadata only, no file data).
 		// Skip files that are missing or inaccessible so we don't fail the whole batch.
 		const pathsToUpload: string[] = [];
-		const fileMetadata: Array<{ name: string; size: number; type: string }> = [];
+		const fileMetadata: FileUploadMetadata[] = [];
 		for (const filePath of filePaths) {
 			try {
 				const stats = fs.statSync(filePath);
 				pathsToUpload.push(filePath);
-				fileMetadata.push({
-					name: path.basename(filePath),
-					size: stats.size,
-					type: getMimeType(filePath),
-				});
+				fileMetadata.push(buildUploadMetadata(filePath, stats.size, isScreenshot));
 			} catch (err) {
 				log.warn('File inaccessible, skipping', {
 					path: filePath,
@@ -586,7 +615,7 @@ export class Uploader {
 		// Pass 2: apply user-specific upload limit (free 200MB, staff 4.9GB)
 		const uploadLimit = await this.getUploadLimit();
 		const validPaths: string[] = [];
-		const validMetadata: Array<{ name: string; size: number; type: string }> = [];
+		const validMetadata: FileUploadMetadata[] = [];
 		const pass2Skipped: string[] = [];
 		for (let i = 0; i < pathsToUpload.length; i++) {
 			if (fileMetadata[i].size > uploadLimit) {
