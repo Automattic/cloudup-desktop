@@ -56,6 +56,9 @@
     "handlebars": "^4.7.9",
     "app-builder-lib": {
       "@noble/hashes": "1.8.0"
+    },
+    "typed-rest-client": {
+      "qs": "^6.15.3"
     }
   }
 }
