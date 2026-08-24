@@ -38,10 +38,10 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
 
-publish:
-  provider: github
-  owner: Automattic
-  repo: cloudup
+# NOTE: no `publish` target is configured on purpose. The production
+# distribution backend (Apps CDN / Releases v2 vs. a public releases repo) is
+# not yet decided; CI builds with `--publish never`. Do not add a publish
+# target until that decision is made and the update feed is tested end-to-end.
 
 extraMetadata:
   main: dist/main/index.js

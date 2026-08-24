@@ -1,0 +1,80 @@
+# Dependabot configuration for cloudup-desktop.
+#
+# Notes:
+# - Minor + patch updates are grouped into a single PR so transitive bumps
+#   don't each spawn their own PR.
+# - `ignore: semver-major` only suppresses *version* updates; Dependabot can
+#   still open *security* PRs for majors. Security PRs require "Dependabot
+#   security updates" to be enabled in the repo settings — this file alone
+#   does not turn them on.
+
+version: 2
+updates:
+  # Node.js dependencies (Electron app)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Automattic/greenhouse"
+    commit-message:
+      prefix: "npm"
+      include: "scope"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+      security:
+        applies-to: "security-updates"
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # Ruby dependencies (fastlane release tooling)
+  - package-ecosystem: "bundler"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Automattic/greenhouse"
+    commit-message:
+      prefix: "bundler"
+      include: "scope"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+      security:
+        applies-to: "security-updates"
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "Automattic/greenhouse"
+    commit-message:
+      prefix: "github-actions"
+      include: "scope"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

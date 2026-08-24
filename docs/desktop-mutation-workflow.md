@@ -11,17 +11,17 @@ Run mutation **mainly when tests change** (new or updated tests). That's when yo
 From repo root:
 
 ```bash
-make desktop:mutation
+make mutation
 ```
 
 This runs Stryker and then generates:
 
-- **`apps/desktop/reports/mutation/mutation.html`** — full report (all mutants, coverage, which tests ran).
-- **`apps/desktop/reports/mutation-follow-up.md`** — checklist of **Survived** mutants only (where to strengthen assertions). NoCoverage is omitted; use the coverage report for that.
+- **`reports/mutation/mutation.html`** — full report (all mutants, coverage, which tests ran).
+- **`reports/mutation-follow-up.md`** — checklist of **Survived** mutants only (where to strengthen assertions). NoCoverage is omitted; use the coverage report for that.
 
 ## 2. Identify weak tests
 
-From `apps/desktop`:
+From the repo root:
 
 ```bash
 npm run mutation:weak-tests
@@ -46,7 +46,7 @@ Optional: run `npm run mutation:weak-tests` to see which tests are in the “nev
 Re-run mutation and check that the report updates:
 
 ```bash
-make desktop:mutation
+make mutation
 ```
 
 - **Survived** count should go down for the code you targeted.
@@ -57,10 +57,10 @@ make desktop:mutation
 
 | Step | Command / artifact | Purpose |
 |------|--------------------|---------|
-| 1 | `make desktop:mutation` | Get mutation report and Survived checklist |
-| 2 | `npm run mutation:weak-tests` (in `apps/desktop`) | List tests that never kill (only cover Survived) |
+| 1 | `make mutation` | Get mutation report and Survived checklist |
+| 2 | `npm run mutation:weak-tests` (at the repo root) | List tests that never kill (only cover Survived) |
 | 3 | Use follow-up + HTML report | Find Survived mutants and the tests that cover them; strengthen assertions |
-| 4 | `make desktop:mutation` again | Confirm Survived and weak-test list shrink |
+| 4 | `make mutation` again | Confirm Survived and weak-test list shrink |
 
 ---
 
@@ -68,12 +68,12 @@ make desktop:mutation
 
 ### One-time vs ongoing
 
-- **One-time:** Run a full mutation (`make desktop:mutation`), fix all Survived mutants, and (optionally) commit or store the resulting report as a baseline.
-- **Ongoing:** After that, run mutation when you add or change tests (and optionally when you change source). Use incremental mode (`make desktop:mutation-incremental`) so only changed code and tests are re-evaluated; the rest reuses the baseline.
+- **One-time:** Run a full mutation (`make mutation`), fix all Survived mutants, and (optionally) commit or store the resulting report as a baseline.
+- **Ongoing:** After that, run mutation when you add or change tests (and optionally when you change source). Use incremental mode (`make mutation-incremental`) so only changed code and tests are re-evaluated; the rest reuses the baseline.
 
 ### Mutating only specific files
 
-Stryker mutates **source files**, not tests. You can limit which code is mutated via the `mutate` config (in `apps/desktop/stryker.config.json`) or by passing a different config.
+Stryker mutates **source files**, not tests. You can limit which code is mutated via the `mutate` config (in `stryker.config.json`) or by passing a different config.
 
 Examples:
 
@@ -94,17 +94,17 @@ From repo root:
 
 ```bash
 # First run: full mutation, writes incremental baseline (e.g. reports/stryker-incremental.json)
-make desktop:mutation
+make mutation
 
 # Later runs: only changed code is re-mutated; rest comes from baseline
-make desktop:mutation-incremental
+make mutation-incremental
 ```
 
 You need a baseline first (one full run). Commit or keep the incremental report so later runs can reuse it. Stryker uses a file diff to decide what changed; with the Jest runner it can also take test file changes into account.
 
 ### Pre-push hook (incremental, planned)
 
-A pre-push hook can run `make desktop:mutation-incremental` when the push includes **desktop test changes** (e.g. files under `apps/desktop/` matching `**/*.test.ts`), since mutation is about validating tests. Add it only after cleaning up existing Survived mutants. Until then, run `make desktop:mutation-incremental` manually when you change tests.
+A pre-push hook can run `make mutation-incremental` when the push includes **desktop test changes** (e.g. files under `` matching `**/*.test.ts`), since mutation is about validating tests. Add it only after cleaning up existing Survived mutants. Until then, run `make mutation-incremental` manually when you change tests.
 
 ---
 

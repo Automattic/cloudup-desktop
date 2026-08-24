@@ -64,7 +64,7 @@ function main() {
     '',
     'NoCoverage mutants are omitted; use the coverage report (`coverage/lcov-report/` or `npm test -- --coverage --coverageProvider=v8`) to find uncovered code and add tests first.',
     '',
-    `Generated from \`reports/mutation/mutation.json\` (run \`make desktop:mutation\` from repo root to refresh). ${noCoverageCount} NoCoverage mutants omitted.`,
+    `Generated from \`reports/mutation/mutation.json\` (run \`make mutation\` from repo root to refresh). ${noCoverageCount} NoCoverage mutants omitted.`,
     '',
     '| File | Line | Mutator | Replacement |',
     '|------|------|---------|-------------|',

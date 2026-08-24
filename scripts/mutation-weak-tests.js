@@ -3,7 +3,7 @@
  * (never kill any). Those tests run code but don't assert on behavior that would
  * catch mutations — candidates for strengthening.
  *
- * Run after: npm run test:mutation (or make desktop:mutation)
+ * Run after: npm run test:mutation (or make mutation)
  */
 
 const fs = require('fs');

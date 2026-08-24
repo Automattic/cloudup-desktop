@@ -15,24 +15,22 @@ A native macOS menu bar app that wraps the Cloudup web app with native OS integr
 - **Auto-updater** checks for new versions on startup and every 4 hours (production only)
 - **Preferences** via right-click tray menu: "Open at Login" and "Auto-Stream Screenshots" toggles
 
-For architecture details and implementation notes, see [docs/plans/webview-desktop-app.md](../../docs/plans/webview-desktop-app.md).
+For architecture details and implementation notes, see `docs/plans/webview-desktop-app.md` in the [cloudup-mono](https://github.com/Automattic/cloudup-mono) repository, where this app was originally developed (extracted to this standalone repository in August 2026).
 
 ## Prerequisites
 
-- Node.js 20 LTS (see root `.nvmrc`; Node 25+ has compatibility issues with electron-builder)
+- Node.js 20 LTS (see `.nvmrc`; Node 25+ has compatibility issues with electron-builder)
 - npm
 - The Cloudup web app must be running (for development) or accessible (for production)
 
 ## Quick Start
 
 ```bash
-# from the root of cloudup-mono
-make up
-make cloudup-js:build
-cd apps/desktop
 npm install
-npm run dev
+npm run stage   # build and run against staging
 ```
+
+For local development against `cloudup.test`, the [cloudup-mono](https://github.com/Automattic/cloudup-mono) dev stack must be running (`make up && make cloudup-js:build` there), then `npm run dev` here.
 
 ## Development
 
@@ -82,21 +80,21 @@ Packaged builds bake in the environment: `dist:mac` uses production (cloudup.com
 
 ### Make Targets
 
-These wrap the npm scripts from the repository root:
+These wrap the npm scripts (each runs `npm install` first if the lockfile changed):
 
 | Target | Description |
 |--------|-------------|
-| `make desktop` | Install deps and build |
-| `make desktop:install` | Install dependencies |
-| `make desktop:build` | Compile TypeScript |
-| `make desktop:dev` | Build web app and run against cloudup.test |
-| `make desktop:stage` | Run against staging |
-| `make desktop:prod` | Run against production |
-| `make desktop:start` | Run without rebuilding |
-| `make desktop:dist` | Package for distribution |
-| `make desktop:dist:mac` | Package macOS DMG |
-
-Note: `make desktop:dev` automatically runs `make cloudup-js:build` first, since the desktop app depends on the web app's `__cloudup_uploader__` export.
+| `make build` | Compile TypeScript |
+| `make dev` | Run against cloudup.test (requires the cloudup-mono dev stack) |
+| `make stage` | Run against staging |
+| `make prod` | Run against production |
+| `make start` | Run without rebuilding |
+| `make test` | Run Jest tests |
+| `make lint` / `make fix` | Lint / auto-fix |
+| `make mutation` / `make mutation-incremental` | Stryker mutation testing + follow-up report |
+| `make dist` | Package for distribution |
+| `make dist:mac` | Package macOS DMG |
+| `make hooks` | Install the pre-push git hook (lint + incremental mutation) |
 
 ## Environment Configuration
 
@@ -111,7 +109,7 @@ The app uses the `CLOUDUP_ENV` environment variable (at dev time) or a baked-in 
 ## Project Structure
 
 ```
-apps/desktop/
+cloudup-desktop/
 ├── src/
 │   ├── main/                     # Main process
 │   │   ├── index.ts              # Entry point, app lifecycle
@@ -146,7 +144,7 @@ apps/desktop/
 └── .xcode-version
 ```
 
-CI pipeline configuration lives at `.buildkite/desktop/` in the repository root.
+CI pipeline configuration lives at `.buildkite/` (Buildkite, staging build) and `.github/workflows/` (lint, tests, unsigned build).
 
 ## How It Works
 
@@ -177,14 +175,14 @@ macOS builds are signed and notarized via Fastlane:
 
 - **Code signing** uses `fastlane match` with Developer ID certificates stored in S3
 - **Notarization** submits the `.app` bundle to Apple's notary service
-- **CI** runs on Buildkite (`.buildkite/desktop/pipeline.yml`) with a Mac agent queue
+- **CI** runs on Buildkite (`.buildkite/pipeline.yml`) with a Mac agent queue
 
-Packaged artifacts (DMG + ZIP) are output to `apps/desktop/release/`.
+Packaged artifacts (DMG + ZIP) are output to `release/`.
 
 ## Troubleshooting
 
 ### "Web app uploader not available"
-The web app hasn't exposed its uploader. Rebuild the web app:
+The web app hasn't exposed its uploader. Rebuild the web app (in the cloudup-mono checkout):
 ```bash
 make cloudup-js:build
 ```

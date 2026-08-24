@@ -12,5 +12,5 @@ export CI_TOOLKIT_PLUGIN="automattic/a8c-ci-toolkit#3.1.0"
 export NVM_PLUGIN="automattic/nvm#0.6.0"
 
 # The ~> modifier is not currently used, but we check for it just in case
-xcode_version=$(sed 's/^~> //' apps/desktop/.xcode-version)
+xcode_version=$(sed 's/^~> //' .xcode-version)
 export IMAGE_ID="xcode-$xcode_version"

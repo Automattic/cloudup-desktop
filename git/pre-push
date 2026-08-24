@@ -1,0 +1,78 @@
+#!/bin/bash
+
+# Run lint and incremental mutation testing when files are being pushed.
+# Blocks push if lint fails or if pushing new test files introduces new surviving mutants.
+# Install with `make hooks`.
+
+remote="$1"
+
+count_survivors() {
+    python3 -c "
+import json
+try:
+    d = json.load(open('reports/mutation/mutation.json'))
+    print(sum(1 for f in d.get('files', {}).values() for m in f.get('mutants', []) if m.get('status') == 'Survived'))
+except Exception:
+    print(0)
+" 2>/dev/null
+}
+
+# Read the exact refs being pushed from stdin (the git-documented approach).
+# Each line: <local-ref> <local-sha1> <remote-ref> <remote-sha1>
+pushed=""
+while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
+    # Skip branch deletions.
+    if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+        continue
+    fi
+
+    # For new branches (no remote counterpart yet), diff against trunk.
+    if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+        base="$remote/trunk"
+    else
+        base="$remote_sha"
+    fi
+
+    pushed="$pushed$(git diff --name-only "$base".."$local_sha" 2>/dev/null)"$'\n'
+done
+
+if [ -z "$(echo "$pushed" | tr -d '[:space:]')" ]; then
+    exit 0
+fi
+
+if echo "$pushed" | grep -q '^src/'; then
+    echo "Source files changed — running lint..."
+    make lint
+    if [ $? -ne 0 ]; then
+        echo "lint failed"
+        exit 1
+    fi
+fi
+
+if echo "$pushed" | grep -q '^src/.*\.test\.ts$'; then
+    echo "Test files changed — running incremental mutation testing..."
+
+    # Snapshot survivor count before so we only block on newly introduced survivors.
+    pre_survivors=$(count_survivors)
+
+    make mutation-incremental
+    if [ $? -ne 0 ]; then
+        echo "mutation-incremental failed"
+        exit 1
+    fi
+
+    post_survivors=$(count_survivors)
+    new_survivors=$(( post_survivors - pre_survivors ))
+
+    if [ "$new_survivors" -gt 0 ]; then
+        echo ""
+        echo "Mutation testing found $new_survivors new surviving mutant(s) (${pre_survivors} → ${post_survivors})."
+        echo "See reports/mutation-follow-up.md for details."
+        echo "Push blocked — fix survivors or add Stryker disable pragmas for equivalent mutants."
+        exit 1
+    fi
+
+    echo "Mutation testing passed (no new survivors)."
+fi
+
+exit 0

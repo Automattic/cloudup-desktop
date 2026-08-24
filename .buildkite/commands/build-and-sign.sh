@@ -2,7 +2,7 @@
 
 set -eu -o pipefail
 
-cd apps/desktop
+
 
 echo "--- :ruby: Install Ruby tooling"
 install_gems

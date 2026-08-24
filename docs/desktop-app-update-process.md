@@ -208,7 +208,7 @@ The legacy app uses bundle ID `com.cloudup.Cloudup`. The Electron app uses `com.
 
 1. **Build the Electron app** for production:
    ```bash
-   cd apps/desktop
+   # (repo root)
    npm run dist:mac
    ```
    This produces `release/Cloudup-{version}-arm64.dmg` and `release/Cloudup-{version}-arm64.zip`.
@@ -286,11 +286,11 @@ If the Electron app has critical issues after the transition update:
 
 ---
 
-## New Electron App (apps/desktop)
+## New Electron App (this repository)
 
 ### Current auto-update implementation
 
-The Electron app at `apps/desktop/` uses `electron-updater` (v6.7.3). The update logic is in `src/main/updater.ts`:
+The Electron app in this repository uses `electron-updater` (v6.7.3). The update logic is in `src/main/updater.ts`:
 
 - Only active when `ENV === 'production'`
 - Auto-downloads updates in the background
@@ -343,7 +343,7 @@ releaseDate: '2026-03-11T12:00:00.000Z'
 
 ### Automated release pipeline
 
-Releases should be automated via CI. The current Buildkite pipeline (`.buildkite/desktop/`) already builds and signs the app but uses `--publish never`.
+Releases should be automated via CI. The current Buildkite pipeline (`.buildkite/`) already builds and signs the app but uses `--publish never`.
 
 **To enable automated releases:**
 
@@ -383,7 +383,7 @@ Before enabling automated publishing:
 
 - **Staged rollouts**: The legacy app uses a percentile system. `electron-updater` supports this via the `stagingPercentage` field in `latest-mac.yml`.
 - **Busy/visible guards**: Port the legacy behavior where updates are deferred during uploads or when the UI is active. The current implementation installs unconditionally on quit.
-- **Code signing & notarization**: Already handled by Fastlane in `.buildkite/desktop/` and `apps/desktop/fastlane/Fastfile`.
+- **Code signing & notarization**: Already handled by Fastlane in `.buildkite/` and `fastlane/Fastfile`.
 
 ### Comparison: legacy vs new
 

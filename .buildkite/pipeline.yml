@@ -1,13 +1,23 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 ---
-# Variables used in this pipeline are defined in `shared-pipeline-vars`, which is `source`'d before calling `buildkite-agent pipeline upload`
+# Variables used in this pipeline are defined in `shared-pipeline-vars`, which is `source`'d before calling `buildkite-agent pipeline upload`.
+#
+# This is the ordinary CI pipeline (staging build). Production release lanes
+# (code freeze, beta, finalize, publish, hotfix) are expected to be added later
+# as separate files under `.buildkite/release-pipelines/` — do not grow this
+# pipeline into the production release path.
 
 steps:
-  - label: ":pipeline: Desktop"
-    command: |
-      source .buildkite/shared-pipeline-vars
-      buildkite-agent pipeline upload .buildkite/desktop/pipeline.yml
+  - label: ":mac: Build & Sign Desktop App"
+    command: .buildkite/commands/build-and-sign.sh
     agents:
-      queue: upload
+      queue: mac
     plugins:
       - $CI_TOOLKIT_PLUGIN
+      - $NVM_PLUGIN
+    artifact_paths:
+      - release/*.dmg
+      - release/*.zip
+    env:
+      CLOUDUP_ENV: staging
+      IMAGE_ID: $IMAGE_ID
