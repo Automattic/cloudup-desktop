@@ -42,7 +42,7 @@
     "@stryker-mutator/jest-runner": "^9.6.1",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.2.0",
-    "electron": "42.9.0",
+    "electron": "42.9.3",
     "electron-builder": "^26.15.3",
     "eslint": "^10.8.1",
     "jest": "^30.4.2",
