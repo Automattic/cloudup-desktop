@@ -19,7 +19,7 @@ For architecture details and implementation notes, see `docs/plans/webview-deskt
 
 ## Prerequisites
 
-- Node.js 20 LTS (see `.nvmrc`; Node 25+ has compatibility issues with electron-builder)
+- Node.js 22 LTS (see `.nvmrc`; Electron 42 requires 22.12+, and Node 25+ has compatibility issues with electron-builder)
 - npm
 - The Cloudup web app must be running (for development) or accessible (for production)
 
