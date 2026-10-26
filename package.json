@@ -34,21 +34,21 @@
     "chokidar": "^4.0.0",
     "electron-log": "^5.4.4",
     "electron-store": "^11.0.2",
-    "electron-updater": "^6.8.9"
+    "electron-updater": "^6.8.11"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@stryker-mutator/core": "^9.0.0",
     "@stryker-mutator/jest-runner": "^9.6.1",
     "@types/jest": "^30.0.0",
-    "@types/node": "^26.2.0",
-    "electron": "42.9.0",
-    "electron-builder": "^26.15.3",
-    "eslint": "^10.8.1",
-    "jest": "^30.4.2",
-    "ts-jest": "^29.4.12",
+    "@types/node": "^26.6.5",
+    "electron": "42.11.18",
+    "electron-builder": "^26.18.0",
+    "eslint": "^10.13.0",
+    "jest": "^30.5.2",
+    "ts-jest": "^29.4.15",
     "typescript": "^6.0.2",
-    "typescript-eslint": "^8.67.0"
+    "typescript-eslint": "^8.72.0"
   },
   "overrides": {
     "glob": "^11.0.0",
