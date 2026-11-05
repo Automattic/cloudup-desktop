@@ -6,7 +6,7 @@ set -eu -o pipefail
 # to set up some variables that will be interpolated in the `.yml` pipeline before uploading it.
 
 # https://github.com/Automattic/a8c-ci-toolkit-buildkite-plugin
-export CI_TOOLKIT_PLUGIN="automattic/a8c-ci-toolkit#3.1.0"
+export CI_TOOLKIT_PLUGIN="automattic/a8c-ci-toolkit#7.1.1"
 
 # https://github.com/Automattic/nvm-buildkite-plugin
 export NVM_PLUGIN="automattic/nvm#0.6.0"
