@@ -41,14 +41,14 @@
     "@stryker-mutator/core": "^9.0.0",
     "@stryker-mutator/jest-runner": "^9.6.1",
     "@types/jest": "^30.0.0",
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "electron": "42.11.18",
     "electron-builder": "^26.18.0",
-    "eslint": "^10.13.0",
+    "eslint": "^10.14.0",
     "jest": "^30.5.2",
     "ts-jest": "^29.4.15",
     "typescript": "^6.0.2",
-    "typescript-eslint": "^8.72.0"
+    "typescript-eslint": "^8.72.1"
   },
   "overrides": {
     "glob": "^11.0.0",
