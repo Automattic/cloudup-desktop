@@ -1,4 +1,14 @@
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { BrowserWindow, Notification, clipboard } from 'electron';
+import { TokenExtractor } from '../auth/token-extractor';
+import { TokenStore } from '../auth/token-store';
+import { CONFIG } from '../../shared/config';
 import {
+	Uploader,
+	buildStreamUrl,
+	buildUploadSuccessBody,
 	buildUploadMetadata,
 	getMimeType,
 	isNetworkUnreachableError,
@@ -200,5 +210,108 @@ describe('runWithConcurrency', () => {
 				if (item === 2) throw new Error('fail');
 			})
 		).rejects.toThrow('fail');
+	});
+});
+
+describe('buildStreamUrl', () => {
+	it('builds the public stream URL from the web app origin', () => {
+		expect(buildStreamUrl('sAbC123')).toBe(`${CONFIG.webAppUrl}/sAbC123`);
+	});
+});
+
+describe('buildUploadSuccessBody', () => {
+	it('uses singular wording for one file', () => {
+		expect(buildUploadSuccessBody(1)).toBe('Your file was uploaded to Cloudup. Click to open.');
+	});
+
+	it('includes the count for multiple files', () => {
+		expect(buildUploadSuccessBody(3)).toBe('3 files were uploaded to Cloudup. Click to open.');
+	});
+});
+
+describe('Uploader success flow', () => {
+	let tmpDir: string;
+	let filePath: string;
+	let showWindow: jest.Mock;
+	let loadURL: jest.Mock;
+	let isDestroyed: jest.Mock;
+	let notificationHandlers: Record<string, () => void>;
+	let notificationShow: jest.Mock;
+	let uploader: Uploader;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cloudup-uploader-test-'));
+		filePath = path.join(tmpDir, 'Screenshot.png');
+		fs.writeFileSync(filePath, 'png');
+
+		notificationHandlers = {};
+		notificationShow = jest.fn();
+		(Notification as unknown as jest.Mock).mockImplementation(() => ({
+			show: notificationShow,
+			on: (event: string, handler: () => void) => {
+				notificationHandlers[event] = handler;
+			},
+		}));
+
+		jest.spyOn(TokenStore, 'load').mockReturnValue(null);
+		jest
+			.spyOn(Uploader.prototype as unknown as { doUploadMultiple: () => Promise<unknown> }, 'doUploadMultiple')
+			.mockResolvedValue({ streamId: 'sAbC123', uploadedCount: 1 });
+
+		showWindow = jest.fn();
+		loadURL = jest.fn();
+		isDestroyed = jest.fn(() => false);
+		const win = { isDestroyed, loadURL } as unknown as BrowserWindow;
+		const tokenExtractor = { getToken: jest.fn().mockResolvedValue('token') } as unknown as TokenExtractor;
+		uploader = new Uploader(tokenExtractor, win, showWindow);
+	});
+
+	afterEach(() => {
+		jest.restoreAllMocks();
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it('copies the stream link to the clipboard and says so', async () => {
+		await uploader.upload(filePath, true);
+
+		expect(clipboard.writeText).toHaveBeenCalledWith(`${CONFIG.webAppUrl}/sAbC123`);
+		expect(Notification).toHaveBeenCalledWith({
+			title: 'Uploaded — link copied',
+			body: 'Your file was uploaded to Cloudup. Click to open.',
+		});
+		expect(notificationShow).toHaveBeenCalled();
+	});
+
+	it('does not open the window for screenshot uploads', async () => {
+		await uploader.upload(filePath, true);
+
+		expect(showWindow).not.toHaveBeenCalled();
+		expect(loadURL).not.toHaveBeenCalled();
+	});
+
+	it('still opens the window for non-screenshot uploads', async () => {
+		await uploader.uploadMultiple([filePath]);
+
+		expect(showWindow).toHaveBeenCalledTimes(1);
+		expect(clipboard.writeText).toHaveBeenCalledWith(`${CONFIG.webAppUrl}/sAbC123`);
+	});
+
+	it('opens the stream when the notification is clicked', async () => {
+		await uploader.upload(filePath, true);
+		expect(showWindow).not.toHaveBeenCalled();
+
+		notificationHandlers.click();
+
+		expect(showWindow).toHaveBeenCalledTimes(1);
+		expect(loadURL).toHaveBeenCalledWith(`${CONFIG.webAppUrl}/sAbC123`);
+	});
+
+	it('does not load the stream if the window was closed before the click', async () => {
+		await uploader.upload(filePath, true);
+		isDestroyed.mockReturnValue(true);
+
+		notificationHandlers.click();
+
+		expect(loadURL).not.toHaveBeenCalled();
 	});
 });
