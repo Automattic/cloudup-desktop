@@ -1,4 +1,4 @@
-import { Notification, BrowserWindow, net } from 'electron';
+import { Notification, BrowserWindow, clipboard, net } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as https from 'https';
@@ -109,6 +109,17 @@ export function buildUploadMetadata(
 		type: getMimeType(filePath),
 		screenshot: isScreenshot,
 	};
+}
+
+/** Public URL of a stream, i.e. the link a user would paste to share an upload. */
+export function buildStreamUrl(streamId: string): string {
+	return `${CONFIG.webAppUrl}/${streamId}`;
+}
+
+export function buildUploadSuccessBody(count: number): string {
+	return count === 1
+		? 'Your file was uploaded to Cloudup. Click to open.'
+		: `${count} files were uploaded to Cloudup. Click to open.`;
 }
 
 export class Uploader {
@@ -237,7 +248,13 @@ export class Uploader {
 		this.batchRunning = true;
 		try {
 			this.onUploadStarted?.();
-			this.showWindow(); // Show webview so user can see upload progress
+			// Screenshots are capture-then-paste: upload silently in the background
+			// and copy the link, rather than pulling the window in front of whatever
+			// the user is doing. Other uploads (tray drop, file dialog) are explicit
+			// actions, so show the webview for progress.
+			if (!isScreenshot) {
+				this.showWindow();
+			}
 
 			const result = await this.doUploadMultiple(validFiles, isScreenshot);
 
@@ -936,15 +953,17 @@ export class Uploader {
 	}
 
 	private showUploadSuccessNotification(count: number, streamId: string): void {
-		const body = count === 1 ? 'Your file was uploaded to Cloudup.' : `${count} files were uploaded to Cloudup.`;
+		const streamUrl = buildStreamUrl(streamId);
+		// Copy the share link so the user can paste immediately after capture/drop.
+		clipboard.writeText(streamUrl);
 		const notification = new Notification({
-			title: 'Upload Complete',
-			body,
+			title: 'Uploaded — link copied',
+			body: buildUploadSuccessBody(count),
 		});
 		notification.on('click', () => {
 			this.showWindow();
 			if (this.isWindowAlive()) {
-				this.win.loadURL(`${CONFIG.webAppUrl}/${streamId}`);
+				this.win.loadURL(streamUrl);
 			}
 		});
 		notification.show();
