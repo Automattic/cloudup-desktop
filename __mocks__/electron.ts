@@ -6,6 +6,7 @@ export const app = {
   showAboutPanel: jest.fn(),
 };
 export const BrowserWindow = jest.fn();
+export const clipboard = { writeText: jest.fn() };
 export const contextBridge = { exposeInMainWorld: jest.fn() };
 export const dialog = { showOpenDialog: jest.fn() };
 export const globalShortcut = { register: jest.fn(), unregister: jest.fn() };
